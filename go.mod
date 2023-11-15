@@ -1,4 +1,4 @@
-module github.com/merlante/prbac-spicedb
+module github.com/merlante/inventory-access-poc
 
 go 1.21.1
 

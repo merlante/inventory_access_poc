@@ -2,11 +2,11 @@ package main
 
 import (
 	"fmt"
-	"github.com/merlante/prbac-spicedb/api"
+	"github.com/merlante/inventory-access-poc/api"
 	"net/http"
 	"os"
 
-	"github.com/merlante/prbac-spicedb/server"
+	"github.com/merlante/inventory-access-poc/server"
 )
 
 var (

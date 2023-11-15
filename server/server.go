@@ -3,7 +3,7 @@ package server
 import (
 	"context"
 	"github.com/authzed/authzed-go/v1"
-	"github.com/merlante/prbac-spicedb/api"
+	"github.com/merlante/inventory-access-poc/api"
 )
 
 type ContentServer struct {

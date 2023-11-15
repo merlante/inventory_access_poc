@@ -21,7 +21,7 @@ services:
       - "SPICEDB_DATASTORE_BOOTSTRAP_OVERWRITE=true"
       - "SPICEDB_GRPC_PRESHARED_KEY=foobar"
       - "SPICEDB_DATASTORE_ENGINE=postgres"
-      - "SPICEDB_DATASTORE_CONN_URI=postgres://postgres:secret@database:5433/spicedb?sslmode=disable"
+      - "SPICEDB_DATASTORE_CONN_URI=postgres://postgres:secret@spicedb-postgres:5433/spicedb?sslmode=disable"
     depends_on:
       - "migrate"
 
@@ -31,11 +31,11 @@ services:
     restart: "on-failure"
     environment:
       - "SPICEDB_DATASTORE_ENGINE=postgres"
-      - "SPICEDB_DATASTORE_CONN_URI=postgres://postgres:secret@database:5433/spicedb?sslmode=disable"
+      - "SPICEDB_DATASTORE_CONN_URI=postgres://postgres:secret@spicedb-postgres:5433/spicedb?sslmode=disable"
     depends_on:
-      - "database"
+      - "spicedb-postgres"
 
-  database:
+  spicedb-postgres:
     image: "postgres"
     ports:
       - "5433:5433"
@@ -46,12 +46,24 @@ services:
       - "POSTGRES_DB=spicedb"
     command: -p 5433
 
-  inventory_access_poc:
+  content-postgres:
+    image: "postgres"
+    ports:
+      - "5434:5434"
+    expose:
+      - "5434" # Publishes 5434 to other containers but NOT to host machine
+    environment:
+      - "POSTGRES_PASSWORD=secret"
+      - "POSTGRES_DB=content"
+    command: -p 5434
+
+  content-service:
     image: quay.io/ciam_authz/inventory_access_poc
     build:
       context: .
     links:
       - spicedb
+      - content-postgres
     ports:
       - '8080:8080'
     expose:

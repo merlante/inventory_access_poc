@@ -1,4 +1,5 @@
-# PoC for validating big "join" scenarios where large access data sets need to be joined on filtered, sorted and paged content data
+# PoC for validating big "join" scenarios
+PoC for validating big "join" scenarios where large access data sets need to be joined on filtered, sorted and paged content data
 Implement an API that mirrors the "Content" tab on console dot.
 
 # Development

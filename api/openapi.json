@@ -1,0 +1,73 @@
+{
+  "openapi": "3.0.2",
+  "info": {
+    "title": "PoC console content inventory API",
+    "version": "1.0.0",
+    "description": "Test endpoints for validating JOIN scenarios between access sets from SpiceDB and filtered, sorted and paged sets in inventory."
+  },
+  "paths": {
+    "/content/packages": {
+      "summary": "Content packages",
+      "description": "",
+      "get": {
+        "parameters": [
+          {
+            "name": "page",
+            "description": "Page number for packages.",
+            "schema": {
+              "type": "integer"
+            },
+            "in": "query",
+            "required": false
+          },
+          {
+            "name": "matches",
+            "description": "Matches all packages whose name contains this parameter as a substring",
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "required": false
+          },
+          {
+            "name": "patches_available",
+            "description": "Filter for packages for which there are systems with patches available (true) or already up to date (false).",
+            "schema": {
+              "type": "boolean"
+            },
+            "in": "query",
+            "required": false
+          },
+          {
+            "name": "tag",
+            "description": "Filter package by tag",
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "required": false
+          },
+          {
+            "name": "sort_key",
+            "description": "The package key to sort by.",
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "required": false
+          },
+          {
+            "name": "sort_order",
+            "description": "Sorting ascending (true) or descending (false).",
+            "schema": {
+              "type": "boolean"
+            },
+            "in": "query",
+            "required": false
+          }
+        ],
+        "description": "Get packages available for patchable systems."
+      }
+    }
+  }
+}

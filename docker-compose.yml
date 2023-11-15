@@ -1,0 +1,62 @@
+# Copied from insights-ingress-go
+# This podman compose file stands up local dependencies for
+# Kafka, Zookeeper, Minio and insights-ingress-go.
+# Please consult its README.md for bucket creation steps
+version: "3"
+services:
+  spicedb:
+    image: "authzed/spicedb"
+    volumes:
+      - "./schema/spicedb_bootstrap.yaml:/mnt/spicedb_bootstrap.yaml"
+    command: "serve"
+    restart: "always"
+    ports:
+      - "8081:8081"
+      - "9090:9090"
+      - "50051:50051"
+    expose:
+      - "50051"
+    environment:
+      - "SPICEDB_DATASTORE_BOOTSTRAP_FILES=/mnt/spicedb_bootstrap.yaml"
+      - "SPICEDB_DATASTORE_BOOTSTRAP_OVERWRITE=true"
+      - "SPICEDB_GRPC_PRESHARED_KEY=foobar"
+      - "SPICEDB_DATASTORE_ENGINE=postgres"
+      - "SPICEDB_DATASTORE_CONN_URI=postgres://postgres:secret@database:5433/spicedb?sslmode=disable"
+    depends_on:
+      - "migrate"
+
+  migrate:
+    image: "authzed/spicedb"
+    command: "migrate head"
+    restart: "on-failure"
+    environment:
+      - "SPICEDB_DATASTORE_ENGINE=postgres"
+      - "SPICEDB_DATASTORE_CONN_URI=postgres://postgres:secret@database:5433/spicedb?sslmode=disable"
+    depends_on:
+      - "database"
+
+  database:
+    image: "postgres"
+    ports:
+      - "5433:5433"
+    expose:
+      - "5433" # Publishes 5433 to other containers but NOT to host machine
+    environment:
+      - "POSTGRES_PASSWORD=secret"
+      - "POSTGRES_DB=spicedb"
+    command: -p 5433
+
+  inventory_access_poc:
+    image: quay.io/ciam_authz/inventory_access_poc
+    build:
+      context: .
+    links:
+      - spicedb
+    ports:
+      - '8080:8080'
+    expose:
+      - "8080"
+    environment:
+      SPICEDB_URL: "spicedb:50051"
+      SPICEDB_PSK: "foobar"
+    restart: unless-stopped

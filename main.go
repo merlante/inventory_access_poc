@@ -19,16 +19,23 @@ func main() {
 
 	spiceDbClient, err := server.GetSpiceDbClient(spiceDBURL, spiceDBToken)
 	if err != nil {
-		fmt.Errorf("%v", err)
+		err := fmt.Errorf("%v", err)
+		fmt.Println(err)
 		os.Exit(1)
 	}
 
-	server := server.ContentServer{
+	srv := server.ContentServer{
 		SpicedbClient: spiceDbClient,
 	}
-	r := api.Handler(api.NewStrictHandler(&server, nil))
+	r := api.Handler(api.NewStrictHandler(&srv, nil))
 
-	http.ListenAndServe(":8080", r)
+	sErr := http.ListenAndServe(":8080", r)
+
+	if sErr != nil {
+		err := fmt.Errorf("error at server startup: %v", sErr)
+		fmt.Println(err)
+		os.Exit(1)
+	}
 }
 
 func overwriteVarsFromEnv() {

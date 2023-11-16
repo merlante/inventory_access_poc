@@ -1,8 +1,10 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"github.com/merlante/inventory-access-poc/api"
+	"github.com/merlante/inventory-access-poc/client"
 	"net/http"
 	"os"
 
@@ -12,20 +14,30 @@ import (
 var (
 	spiceDBURL   = "localhost:50051"
 	spiceDBToken = "foobar"
+	contentPgUri = "postgres://postgres:secret@content-postgres:5434/content?sslmode=disable"
 )
 
 func main() {
 	overwriteVarsFromEnv()
 
-	spiceDbClient, err := server.GetSpiceDbClient(spiceDBURL, spiceDBToken)
+	spiceDbClient, err := client.GetSpiceDbClient(spiceDBURL, spiceDBToken)
 	if err != nil {
 		err := fmt.Errorf("%v", err)
 		fmt.Println(err)
 		os.Exit(1)
 	}
 
+	pgConn, err := client.GetPostgresConnection(contentPgUri)
+	if err != nil {
+		err := fmt.Errorf("%v", err)
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	defer pgConn.Close(context.Background())
+
 	srv := server.ContentServer{
 		SpicedbClient: spiceDbClient,
+		PostgresConn:  pgConn,
 	}
 	r := api.Handler(api.NewStrictHandler(&srv, nil))
 
@@ -43,8 +55,14 @@ func overwriteVarsFromEnv() {
 	if envSpicedbUrl != "" {
 		spiceDBURL = envSpicedbUrl
 	}
+
 	envSpicedbPsk := os.Getenv("SPICEDB_PSK")
 	if envSpicedbPsk != "" {
 		spiceDBToken = envSpicedbPsk
+	}
+
+	envContentPgUri := os.Getenv("CONTENT_POSTGRES_URI")
+	if envContentPgUri != "" {
+		contentPgUri = envContentPgUri
 	}
 }

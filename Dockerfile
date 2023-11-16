@@ -12,6 +12,7 @@ RUN go mod download
 COPY *.go ./
 COPY api/*.go ./api/
 COPY server/*.go ./server/
+COPY client/*.go ./client/
 
 # Build
 RUN CGO_ENABLED=0 GOOS=linux go build -o /content_server

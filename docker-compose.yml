@@ -58,7 +58,7 @@ services:
     command: -p 5434
 
   content-service:
-    image: quay.io/ciam_authz/inventory_access_poc
+    image: quay.io/ciam_authz/inventory_poc_testservice
     build:
       context: .
     links:

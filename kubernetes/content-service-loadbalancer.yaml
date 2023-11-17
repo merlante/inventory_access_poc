@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-internal: "true"
+  labels:
+    app: content-service-lb
+    job: content-service-lb
+  name: content-service-lb
+  namespace: inventory-poc
+spec:
+  ports:
+    - name: content-service
+      nodePort: 32700
+      port: 8080
+      protocol: TCP
+      targetPort: 8080
+    - name: postgres
+      nodePort: 32701
+      port: 5434
+      protocol: TCP
+      targetPort: 5434
+  selector:
+    # update the selector label
+    io.kompose.service: content-service
+  sessionAffinity: None
+  type: LoadBalancer

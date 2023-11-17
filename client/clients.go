@@ -12,6 +12,11 @@ import (
 )
 
 func GetSpiceDbClient(endpoint string, presharedKey string) (*authzed.Client, error) {
+	fmt.Println("Attempting to connect to spicedb...")
+	defer func() {
+		fmt.Println("Connection to spicedb established")
+	}()
+
 	var opts []grpc.DialOption
 
 	opts = append(opts, grpc.WithBlock())
@@ -26,6 +31,8 @@ func GetSpiceDbClient(endpoint string, presharedKey string) (*authzed.Client, er
 }
 
 func GetPostgresConnection(connUri string) (*pgx.Conn, error) {
+	fmt.Println("Attempting to connect to postgres...")
+
 	ctx := context.Background()
 
 	conn, err := pgx.Connect(ctx, connUri)
@@ -36,7 +43,7 @@ func GetPostgresConnection(connUri string) (*pgx.Conn, error) {
 	err = conn.Ping(ctx)
 
 	if err == nil {
-		fmt.Println("Connection to content postgres established")
+		fmt.Println("Connection to postgres established")
 	} else {
 		fmt.Fprintf(os.Stderr, "Couldn't ping content postgres: %v\n", err)
 	}

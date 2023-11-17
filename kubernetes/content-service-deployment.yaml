@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    kompose.cmd: kompose convert -f ../docker-compose.yml
+    kompose.version: 1.31.2 (HEAD)
+  creationTimestamp: null
+  labels:
+    io.kompose.service: content-service
+  name: content-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.kompose.service: content-service
+  strategy: {}
+  template:
+    metadata:
+      annotations:
+        kompose.cmd: kompose convert -f ../docker-compose.yml
+        kompose.version: 1.31.2 (HEAD)
+      creationTimestamp: null
+      labels:
+        io.kompose.network/inventory-access-poc-default: "true"
+        io.kompose.service: content-service
+    spec:
+      containers:
+        - env:
+            - name: SPICEDB_PSK
+              valueFrom:
+                secretKeyRef:
+                  name: spicedb
+                  key: SPICEDB_PSK
+            - name: SPICEDB_URL
+              valueFrom:
+                secretKeyRef:
+                  name: spicedb
+                  key: SPICEDB_URL
+          image: quay.io/ciam_authz/inventory_poc_testservice
+          name: content-service
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+          resources: {}
+          volumeMounts:
+            - name: spicedb
+              readOnly: true
+              mountPath: "/spicedb"
+      volumes:
+        - name: spicedb
+          secret:
+            secretName: spicedb
+      restartPolicy: Always
+status: {}

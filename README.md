@@ -13,8 +13,8 @@ curl "http://localhost:8080/content/packages"
 ```
 ## Docker
 ```
-docker build . -t quay.io/ciam_authz/inventory_access_poc
-docker run -p8080:8080 --rm quay.io/ciam_authz/inventory_access_poc
+docker build . -t quay.io/ciam_authz/inventory_poc_testservice
+docker run -p8080:8080 --rm quay.io/ciam_authz/inventory_poc_testservice
 ```
 ## Regenerate server code
 `oapi-codegen -config api/server.cfg.yaml api/openapi.json`

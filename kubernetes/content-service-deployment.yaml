@@ -36,6 +36,11 @@ spec:
                 secretKeyRef:
                   name: spicedb
                   key: SPICEDB_URL
+            - name: CONTENT_POSTGRES_URI
+              valueFrom:
+                secretKeyRef:
+                  name: postgres
+                  key: CONTENT_POSTGRES_URI
           image: quay.io/ciam_authz/inventory_poc_testservice
           name: content-service
           ports:
@@ -46,9 +51,15 @@ spec:
             - name: spicedb
               readOnly: true
               mountPath: "/spicedb"
+            - name: postgres
+              readOnly: true
+              mountPath: "/postgres"
       volumes:
         - name: spicedb
           secret:
             secretName: spicedb
+        - name: postgres
+          secret:
+            secretName: postgres
       restartPolicy: Always
 status: {}

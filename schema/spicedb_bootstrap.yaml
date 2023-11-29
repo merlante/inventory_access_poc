@@ -974,16 +974,19 @@ schema: |-
     permission write = workspace->inventory_staleness_write + workspace->inventory_staleness_all + workspace->inventory_all_all
   }
 
-  definition inventory/hosts {
+  definition inventory/host {
     relation workspace: workspace
+
+    //synthetic relationships
+    permission patch_system_read = workspace->patch_all_read + workspace->patch_all_all
+    permission patch_system_write = workspace->patch_system_write + workspace->patch_all_write + workspace->patch_all_all
+
     permission read = workspace->inventory_hosts_read + workspace->inventory_hosts_all + workspace->inventory_all_read + workspace->inventory_all_all
     permission write = workspace->inventory_hosts_write + workspace->inventory_hosts_all + workspace->inventory_all_all
   }
 
-  definition inventory/groups {
+  definition inventory/group {
     relation workspace: workspace
-    permission read = workspace->inventory_groups_read + workspace->inventory_groups_all + workspace->inventory_all_read + workspace->inventory_all_all
-    permission write = workspace->inventory_groups_write + workspace->inventory_groups_all + workspace->inventory_all_all
   }
 
   definition notifications/notifications {
@@ -1013,9 +1016,10 @@ schema: |-
   }
 
   definition patch/system {
-    relation workspace: workspace
-    permission write = workspace->patch_system_write + workspace->patch_all_write + workspace->patch_all_all
-    permission read = workspace->patch_all_read + workspace->patch_all_all
+    relation host: inventory/host
+
+    permission write = host->read & host->patch_system_write
+    permission read = host->read & host->patch_system_read
   }
 
   definition patch/template {
@@ -1149,9 +1153,10 @@ schema: |-
     permission write = workspace->vulnerability_all_write + workspace->vulnerability_all_all
   }
 
+
 relationships: |-
   //Static data
-  inventory/hosts:h1#workspace@workspace:aspian_root  
+  inventory/host:h1#workspace@workspace:aspian_root  
   // PRBAC assertions
   role:10d23bda-7507-11ee-8c9d-0242ac170005#inventory_groups_read@user:*
   role:c4eaa6fb-7506-11ee-8c9d-0242ac170005#inventory_hosts_read@user:*
@@ -1159,6 +1164,327 @@ relationships: |-
   role:e18257ae-7506-11ee-8c9d-0242ac170005#inventory_hosts_read@user:*
   role:fca60508-7506-11ee-8c9d-0242ac170005#inventory_groups_read@user:*
   role:fca60508-7506-11ee-8c9d-0242ac170005#inventory_groups_write@user:*
+  // Roles generated from: https://github.com/RedHatInsights/rbac-config/tree/master/configs/prod/roles
+  // Approval Administrator
+  // Should be limited by resource definitions
+  role:approval_administrator#approval_templates_read@user:*
+  // Should be limited by resource definitions
+  role:approval_administrator#approval_workflows_create@user:*
+  // Should be limited by resource definitions
+  role:approval_administrator#approval_workflows_read@user:*
+  // Should be limited by resource definitions
+  role:approval_administrator#approval_workflows_update@user:*
+  // Should be limited by resource definitions
+  role:approval_administrator#approval_workflows_delete@user:*
+  // Should be limited by resource definitions
+  role:approval_administrator#approval_workflows_link@user:*
+  // Should be limited by resource definitions
+  role:approval_administrator#approval_workflows_unlink@user:*
+  // Should be limited by resource definitions
+  role:approval_administrator#approval_requests_create@user:*
+  // Should be limited by resource definitions
+  role:approval_administrator#approval_requests_read@user:*
+  // Should be limited by resource definitions
+  role:approval_administrator#approval_actions_create@user:*
+  // Should be limited by resource definitions
+  role:approval_administrator#approval_actions_read@user:*
+  // Approval User
+  // Should be limited by resource definitions
+  role:approval_user#approval_requests_read@user:*
+  // Should be limited by resource definitions
+  role:approval_user#approval_requests_create@user:*
+  // Should be limited by resource definitions
+  role:approval_user#approval_actions_create@user:*
+  // Should be limited by resource definitions
+  role:approval_user#approval_actions_read@user:*
+  // Should be limited by resource definitions
+  role:approval_user#approval_workflows_read@user:*
+  // Approval Approver
+  // Should be limited by resource definitions
+  role:approval_approver#approval_requests_read@user:*
+  // Should be limited by resource definitions
+  role:approval_approver#approval_actions_create@user:*
+  // Should be limited by resource definitions
+  role:approval_approver#approval_actions_read@user:*
+  // Automation Analytics Administrator
+  role:automation_analytics_administrator#automation_analytics_all_all@user:*
+  // Automation Analytics Editor
+  role:automation_analytics_editor#automation_analytics_all_read@user:*
+  role:automation_analytics_editor#automation_analytics_all_write@user:*
+  // Automation Analytics Viewer
+  role:automation_analytics_viewer#automation_analytics_all_read@user:*
+  // Catalog Administrator
+  // Should be limited by resource definitions
+  role:catalog_administrator#catalog_portfolios_read@user:*
+  role:catalog_administrator#catalog_portfolios_create@user:*
+  // Should be limited by resource definitions
+  role:catalog_administrator#catalog_portfolios_update@user:*
+  // Should be limited by resource definitions
+  role:catalog_administrator#catalog_portfolios_delete@user:*
+  // Should be limited by resource definitions
+  role:catalog_administrator#catalog_portfolios_order@user:*
+  // Should be limited by resource definitions
+  role:catalog_administrator#catalog_portfolio_items_read@user:*
+  // Should be limited by resource definitions
+  role:catalog_administrator#catalog_portfolio_items_create@user:*
+  // Should be limited by resource definitions
+  role:catalog_administrator#catalog_portfolio_items_update@user:*
+  // Should be limited by resource definitions
+  role:catalog_administrator#catalog_portfolio_items_delete@user:*
+  // Should be limited by resource definitions
+  role:catalog_administrator#catalog_portfolio_items_order@user:*
+  // Should be limited by resource definitions
+  role:catalog_administrator#catalog_orders_read@user:*
+  // Should be limited by resource definitions
+  role:catalog_administrator#catalog_orders_write@user:*
+  // Should be limited by resource definitions
+  role:catalog_administrator#catalog_orders_order@user:*
+  // Should be limited by resource definitions
+  role:catalog_administrator#catalog_order_items_read@user:*
+  // Should be limited by resource definitions
+  role:catalog_administrator#catalog_order_items_write@user:*
+  // Should be limited by resource definitions
+  role:catalog_administrator#catalog_order_items_order@user:*
+  // Should be limited by resource definitions
+  role:catalog_administrator#catalog_progress_messages_read@user:*
+  // Should be limited by resource definitions
+  role:catalog_administrator#catalog_progress_messages_write@user:*
+  // Should be limited by resource definitions
+  role:catalog_administrator#catalog_approval_requests_read@user:*
+  // Should be limited by resource definitions
+  role:catalog_administrator#catalog_approval_requests_write@user:*
+  role:catalog_administrator#catalog_tenants_update@user:*
+  role:catalog_administrator#catalog_tenants_read@user:*
+  // Should be limited by resource definitions
+  role:catalog_administrator#catalog_order_processes_create@user:*
+  // Should be limited by resource definitions
+  role:catalog_administrator#catalog_order_processes_delete@user:*
+  // Should be limited by resource definitions
+  role:catalog_administrator#catalog_order_processes_link@user:*
+  // Should be limited by resource definitions
+  role:catalog_administrator#catalog_order_processes_read@user:*
+  // Should be limited by resource definitions
+  role:catalog_administrator#catalog_order_processes_unlink@user:*
+  // Should be limited by resource definitions
+  role:catalog_administrator#catalog_order_processes_update@user:*
+  // Catalog User
+  // Should be limited by resource definitions
+  role:catalog_user#catalog_portfolios_read@user:*
+  // Should be limited by resource definitions
+  role:catalog_user#catalog_portfolios_update@user:*
+  // Should be limited by resource definitions
+  role:catalog_user#catalog_portfolios_order@user:*
+  // Should be limited by resource definitions
+  role:catalog_user#catalog_portfolio_items_read@user:*
+  // Should be limited by resource definitions
+  role:catalog_user#catalog_portfolio_items_update@user:*
+  // Should be limited by resource definitions
+  role:catalog_user#catalog_portfolio_items_order@user:*
+  role:catalog_user#catalog_orders_write@user:*
+  // Should be limited by resource definitions
+  role:catalog_user#catalog_orders_read@user:*
+  role:catalog_user#catalog_orders_order@user:*
+  role:catalog_user#catalog_order_items_write@user:*
+  // Should be limited by resource definitions
+  role:catalog_user#catalog_order_items_read@user:*
+  role:catalog_user#catalog_order_items_order@user:*
+  // Should be limited by resource definitions
+  role:catalog_user#catalog_progress_messages_read@user:*
+  // Should be limited by resource definitions
+  role:catalog_user#catalog_approval_requests_read@user:*
+  role:catalog_user#catalog_tenants_read@user:*
+  // Compliance administrator
+  role:compliance_administrator#compliance_all_all@user:*
+  role:compliance_administrator#inventory_all_read@user:*
+  role:compliance_administrator#remediations_remediation_read@user:*
+  role:compliance_administrator#remediations_remediation_write@user:*
+  // Compliance viewer
+  role:compliance_viewer#compliance_policy_read@user:*
+  role:compliance_viewer#compliance_report_read@user:*
+  role:compliance_viewer#compliance_system_read@user:*
+  role:compliance_viewer#inventory_all_read@user:*
+  role:compliance_viewer#remediations_remediation_read@user:*
+  // RHC Administrator
+  role:rhc_administrator#config_manager_activation_keys_all@user:*
+  role:rhc_administrator#config_manager_state_read@user:*
+  role:rhc_administrator#config_manager_state_write@user:*
+  role:rhc_administrator#config_manager_state_changes_read@user:*
+  role:rhc_administrator#inventory_all_read@user:*
+  // Should be limited by resource definitions
+  role:rhc_administrator#playbook_dispatcher_run_read@user:*
+  role:rhc_administrator#subscriptions_organization_read@user:*
+  // RHC Viewer
+  role:rhc_viewer#config_manager_activation_keys_read@user:*
+  role:rhc_viewer#config_manager_state_read@user:*
+  role:rhc_viewer#config_manager_state_changes_read@user:*
+  role:rhc_viewer#inventory_all_read@user:*
+  // Should be limited by resource definitions
+  role:rhc_viewer#playbook_dispatcher_run_read@user:*
+  // Repositories administrator
+  role:repositories_administrator#content_sources_repositories_read@user:*
+  role:repositories_administrator#content_sources_repositories_write@user:*
+  // Repositories viewer
+  role:repositories_viewer#content_sources_repositories_read@user:*
+  // Cost Administrator
+  role:cost_administrator#cost_management_all_all@user:*
+  // Cost Price List Administrator
+  role:cost_price_list_administrator#cost_management_cost_model_all@user:*
+  role:cost_price_list_administrator#cost_management_settings_all@user:*
+  // Cost Price List Viewer
+  role:cost_price_list_viewer#cost_management_cost_model_read@user:*
+  role:cost_price_list_viewer#cost_management_settings_read@user:*
+  // Cost Cloud Viewer
+  role:cost_cloud_viewer#cost_management_aws_account_all@user:*
+  role:cost_cloud_viewer#cost_management_aws_organizational_unit_all@user:*
+  role:cost_cloud_viewer#cost_management_azure_subscription_guid_all@user:*
+  role:cost_cloud_viewer#cost_management_gcp_account_all@user:*
+  role:cost_cloud_viewer#cost_management_gcp_project_all@user:*
+  role:cost_cloud_viewer#cost_management_oci_payer_tenant_id_all@user:*
+  // Cost OpenShift Viewer
+  role:cost_openshift_viewer#cost_management_openshift_cluster_all@user:*
+  // Drift analysis administrator
+  role:drift_analysis_administrator#drift_comparisons_read@user:*
+  role:drift_analysis_administrator#drift_baselines_read@user:*
+  role:drift_analysis_administrator#drift_baselines_write@user:*
+  role:drift_analysis_administrator#drift_historical_system_profiles_read@user:*
+  role:drift_analysis_administrator#drift_notifications_read@user:*
+  role:drift_analysis_administrator#drift_notifications_write@user:*
+  role:drift_analysis_administrator#inventory_all_read@user:*
+  role:drift_analysis_administrator#drift_all_all@user:*
+  // Drift viewer
+  role:drift_viewer#drift_comparisons_read@user:*
+  role:drift_viewer#drift_baselines_read@user:*
+  role:drift_viewer#drift_historical_system_profiles_read@user:*
+  role:drift_viewer#drift_notifications_read@user:*
+  role:drift_viewer#inventory_all_read@user:*
+  // Insights administrator
+  role:insights_administrator#advisor_all_all@user:*
+  role:insights_administrator#inventory_all_read@user:*
+  // Inventory administrator
+  role:inventory_administrator#inventory_all_all@user:*
+  // Inventory Hosts Administrator
+  role:inventory_hosts_administrator#inventory_hosts_write@user:*
+  role:inventory_hosts_administrator#inventory_hosts_read@user:*
+  // Inventory Hosts Viewer
+  role:inventory_hosts_viewer#inventory_hosts_read@user:*
+  // Inventory Groups Administrator
+  role:inventory_groups_administrator#inventory_groups_write@user:*
+  role:inventory_groups_administrator#inventory_groups_read@user:*
+  // Inventory Groups Viewer
+  role:inventory_groups_viewer#inventory_groups_read@user:*
+  // Account Staleness and Culling Administrator
+  role:account_staleness_and_culling_administrator#inventory_staleness_write@user:*
+  role:account_staleness_and_culling_administrator#inventory_staleness_read@user:*
+  // Account Staleness and Culling Viewer
+  role:account_staleness_and_culling_viewer#inventory_staleness_read@user:*
+  // Malware detection administrator
+  role:malware_detection_administrator#malware_detection_all_all@user:*
+  role:malware_detection_administrator#inventory_all_read@user:*
+  // Malware detection viewer
+  role:malware_detection_viewer#malware_detection_all_read@user:*
+  role:malware_detection_viewer#inventory_all_read@user:*
+  // Notifications administrator
+  role:notifications_administrator#notifications_all_all@user:*
+  role:notifications_administrator#integrations_all_all@user:*
+  // Notifications viewer
+  role:notifications_viewer#notifications_notifications_read@user:*
+  role:notifications_viewer#integrations_endpoints_read@user:*
+  // OCM Cluster Editor
+  // OCM Idp Editor
+  // OCM Machine Pool Editor
+  // OCM Cluster Provisioner
+  // OCM Cluster Viewer
+  // OCM Organization Admin
+  // OCM Cluster Autoscaler Editor
+  // OCP Advisor administrator
+  role:ocp_advisor_administrator#ocp_advisor_all_all@user:*
+  // Patch administrator
+  role:patch_administrator#patch_all_all@user:*
+  role:patch_administrator#inventory_all_read@user:*
+  role:patch_administrator#remediations_all_read@user:*
+  role:patch_administrator#remediations_all_write@user:*
+  // Patch viewer
+  role:patch_viewer#patch_all_read@user:*
+  role:patch_viewer#inventory_all_read@user:*
+  // Policies administrator
+  role:policies_administrator#policies_policies_read@user:*
+  role:policies_administrator#policies_policies_write@user:*
+  role:policies_administrator#inventory_all_read@user:*
+  // Policies viewer
+  role:policies_viewer#policies_policies_read@user:*
+  role:policies_viewer#inventory_all_read@user:*
+  // Launch Administrator
+  role:launch_administrator#provisioning_all_all@user:*
+  // Launch Viewer
+  role:launch_viewer#provisioning_source_read@user:*
+  role:launch_viewer#provisioning_pubkey_read@user:*
+  role:launch_viewer#provisioning_reservation_read@user:*
+  role:launch_viewer#provisioning_reservation_aws_read@user:*
+  role:launch_viewer#provisioning_reservation_azure_read@user:*
+  role:launch_viewer#provisioning_reservation_gcp_read@user:*
+  // Launch on AWS User
+  role:launch_on_aws_user#provisioning_source_all@user:*
+  role:launch_on_aws_user#provisioning_pubkey_all@user:*
+  role:launch_on_aws_user#provisioning_reservation_all@user:*
+  role:launch_on_aws_user#provisioning_reservation_aws_all@user:*
+  // Launch on Azure User
+  role:launch_on_azure_user#provisioning_source_all@user:*
+  role:launch_on_azure_user#provisioning_pubkey_all@user:*
+  role:launch_on_azure_user#provisioning_reservation_all@user:*
+  role:launch_on_azure_user#provisioning_reservation_azure_all@user:*
+  // Launch on Google Cloud User
+  role:launch_on_google_cloud_user#provisioning_source_all@user:*
+  role:launch_on_google_cloud_user#provisioning_pubkey_all@user:*
+  role:launch_on_google_cloud_user#provisioning_reservation_all@user:*
+  role:launch_on_google_cloud_user#provisioning_reservation_gcp_all@user:*
+  // User Access administrator
+  role:user_access_administrator#rbac_all_all@user:*
+  // User Access principal viewer
+  role:user_access_principal_viewer#rbac_principal_read@user:*
+  // Remediations administrator
+  role:remediations_administrator#remediations_all_all@user:*
+  role:remediations_administrator#inventory_all_read@user:*
+  // Should be limited by resource definitions
+  role:remediations_administrator#playbook_dispatcher_run_read@user:*
+  // Remediations user
+  role:remediations_user#remediations_remediation_read@user:*
+  role:remediations_user#remediations_remediation_write@user:*
+  // Should be limited by resource definitions
+  role:remediations_user#playbook_dispatcher_run_read@user:*
+  // Resource Optimization administrator
+  role:resource_optimization_administrator#ros_all_all@user:*
+  role:resource_optimization_administrator#inventory_all_read@user:*
+  // Resource Optimization user
+  role:resource_optimization_user#ros_all_read@user:*
+  role:resource_optimization_user#inventory_all_read@user:*
+  // Sources administrator
+  role:sources_administrator#sources_all_all@user:*
+  // Subscription Watch administrator
+  role:subscription_watch_administrator#subscriptions_all_all@user:*
+  role:subscription_watch_administrator#inventory_all_read@user:*
+  // Subscriptions user
+  role:subscriptions_user#subscriptions_reports_read@user:*
+  role:subscriptions_user#subscriptions_manifests_read@user:*
+  role:subscriptions_user#subscriptions_organization_read@user:*
+  role:subscriptions_user#subscriptions_products_read@user:*
+  role:subscriptions_user#subscriptions_cloud_access_read@user:*
+  role:subscriptions_user#inventory_all_read@user:*
+  // Tasks administrator
+  role:tasks_administrator#tasks_all_all@user:*
+  role:tasks_administrator#inventory_all_read@user:*
+  // Should be limited by resource definitions
+  role:tasks_administrator#playbook_dispatcher_run_read@user:*
+  // Vulnerability administrator
+  role:vulnerability_administrator#vulnerability_all_all@user:*
+  role:vulnerability_administrator#inventory_all_read@user:*
+  role:vulnerability_administrator#remediations_all_read@user:*
+  role:vulnerability_administrator#remediations_all_write@user:*
+  // Vulnerability viewer
+  role:vulnerability_viewer#vulnerability_vulnerability_results_read@user:*
+  role:vulnerability_viewer#vulnerability_system_opt_out_read@user:*
+  role:vulnerability_viewer#vulnerability_report_and_export_read@user:*
+  role:vulnerability_viewer#inventory_all_read@user:*
+  role:vulnerability_viewer#vulnerability_advanced_report_read@user:*
   //assertTrue:
   //  - "workspace:aspian_root#dispatcher_view_runs@user:sara"
   //  - "dispatcher/service:remediations#view@user:david"

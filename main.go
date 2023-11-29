@@ -18,6 +18,17 @@ var (
 )
 
 func main() {
+	if os.Getenv("RUN_ACTION") == "REFRESH_PACKAGE_CACHES" {
+		RefreshPackagesCaches()
+	} else {
+		initServer()
+	}
+}
+
+func RefreshPackagesCaches() {
+}
+
+func initServer() {
 	overwriteVarsFromEnv()
 
 	spiceDbClient, err := client.GetSpiceDbClient(spiceDBURL, spiceDBToken)

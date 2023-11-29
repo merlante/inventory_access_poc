@@ -11,6 +11,12 @@ Test using an endpoint like:
 ```
 curl "http://localhost:8080/content/packages"
 ```
+## Run REFRESH PACKAGE CACHES task
+```
+go build main.go
+CONTENT_POSTGRES_URI=postgres://postgres:@content:5434/content?sslmode=disable;RUN_ACTION=REFRESH_PACKAGE_CACHES ./main
+```
+
 ## Docker
 ```
 docker build . -t quay.io/ciam_authz/inventory_poc_testservice

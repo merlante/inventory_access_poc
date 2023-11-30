@@ -14,7 +14,9 @@ curl "http://localhost:8080/content/packages"
 ## Run REFRESH PACKAGE CACHES task
 ```
 go build main.go
-CONTENT_POSTGRES_URI=postgres://postgres:@content:5434/content?sslmode=disable;RUN_ACTION=REFRESH_PACKAGE_CACHES ./main
+export CONTENT_POSTGRES_URI=postgres://root:toor@localhost:5432/content?sslmode=disable
+export RUN_ACTION=REFRESH_PACKAGE_CACHES 
+./main
 ```
 
 ## Docker

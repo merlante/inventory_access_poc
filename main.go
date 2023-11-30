@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/merlante/inventory-access-poc/api"
+	"github.com/merlante/inventory-access-poc/cachecontent"
 	"github.com/merlante/inventory-access-poc/client"
 	"net/http"
 	"os"
@@ -18,6 +19,8 @@ var (
 )
 
 func main() {
+	overwriteVarsFromEnv()
+
 	if os.Getenv("RUN_ACTION") == "REFRESH_PACKAGE_CACHES" {
 		RefreshPackagesCaches()
 	} else {
@@ -26,11 +29,11 @@ func main() {
 }
 
 func RefreshPackagesCaches() {
+	cachecontent.Configure(contentPgUri)
+	cachecontent.RefreshPackagesCaches(nil)
 }
 
 func initServer() {
-	overwriteVarsFromEnv()
-
 	spiceDbClient, err := client.GetSpiceDbClient(spiceDBURL, spiceDBToken)
 	if err != nil {
 		err := fmt.Errorf("%v", err)

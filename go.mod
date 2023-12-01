@@ -9,7 +9,7 @@ require (
 	github.com/go-chi/chi/v5 v5.0.10
 	github.com/jackc/pgx/v5 v5.5.0
 	github.com/oapi-codegen/runtime v1.0.0
-	google.golang.org/grpc v1.58.2
+	google.golang.org/grpc v1.58.3
 )
 
 require (

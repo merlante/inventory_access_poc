@@ -3,11 +3,13 @@ package main
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"os"
+
 	"github.com/merlante/inventory-access-poc/api"
 	"github.com/merlante/inventory-access-poc/cachecontent"
 	"github.com/merlante/inventory-access-poc/client"
-	"net/http"
-	"os"
+	"github.com/merlante/inventory-access-poc/migration"
 
 	"github.com/merlante/inventory-access-poc/server"
 )
@@ -48,6 +50,15 @@ func initServer() {
 		os.Exit(1)
 	}
 	defer pgConn.Close(context.Background())
+
+	if os.Getenv("RUN_ACTION") == "MIGRATE_CONTENT_TO_SPICEDB" {
+		fmt.Printf("Running migration from ContentDB to SpiceDB")
+		migrator := migration.NewPSQLToSpiceDBMigration(pgConn, spiceDbClient)
+		if err := migrator.MigrationContentDataToSpiceDb(context.TODO()); err != nil {
+			panic(err)
+		}
+		return
+	}
 
 	srv := server.ContentServer{
 		SpicedbClient: spiceDbClient,

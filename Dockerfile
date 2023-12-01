@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi9/ubi-minimal:9.2 AS builder
+FROM registry.access.redhat.com/ubi9/ubi-minimal:9.3 AS builder
 ARG TARGETARCH
 USER root
 RUN microdnf install -y tar gzip make which
@@ -18,7 +18,7 @@ RUN go mod vendor
 # Build
 RUN CGO_ENABLED=0 GOOS=linux go build -o content_server
 
-FROM registry.access.redhat.com/ubi9/ubi-minimal:9.2
+FROM registry.access.redhat.com/ubi9/ubi-minimal:9.3
 
 COPY --from=builder app/content_server /usr/local/bin/
 

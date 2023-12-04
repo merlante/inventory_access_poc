@@ -119,7 +119,6 @@ func (m *PSQLToSpiceDBMigration) addUpdate(resourceType string, resourceId strin
 }
 
 func (m *PSQLToSpiceDBMigration) flushUpdates() error {
-	fmt.Printf("Writing batch of %d updates to SpiceDB\n", len(m.updates))
 	_, err := m.spiceDb.WriteRelationships(m.context, &v1.WriteRelationshipsRequest{
 		Updates: m.updates,
 	})

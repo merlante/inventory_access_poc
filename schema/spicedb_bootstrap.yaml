@@ -1022,6 +1022,12 @@ schema: |-
     permission read = host->read & host->patch_system_read
   }
 
+  definition patch/patch {
+    relation system: patch/system
+
+    permission read = system->read
+  }
+
   definition patch/template {
     relation workspace: workspace
     permission write = workspace->patch_template_write + workspace->patch_all_write + workspace->patch_all_all

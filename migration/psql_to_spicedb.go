@@ -30,7 +30,39 @@ func NewPSQLToSpiceDBMigration(postgres *pgx.Conn, spiceDb *authzed.Client) *PSQ
 	}
 }
 
-func (m *PSQLToSpiceDBMigration) MigrationContentDataToSpiceDb(ctx context.Context) error {
+func (m *PSQLToSpiceDBMigration) MigratePackages(ctx context.Context) error {
+	m.context = ctx
+	rows, err := m.postgres.Query(ctx, "select name_id, system_id from system_package;")
+	if err != nil {
+		return err
+	}
+
+	count := 0
+
+	for rows.Next() {
+		values, err := rows.Values()
+		if err != nil {
+			return err
+		}
+
+		nameId := values[0].(int64)
+		systemId := values[1].(int64)
+
+		if err = m.addUpdate("patch/patch", strconv.FormatInt(nameId, 10), "system", "patch/system", strconv.FormatInt(systemId, 10)); err != nil {
+			return err
+		}
+
+		count++
+		if count%1_000 == 0 {
+			fmt.Printf("\rProcessed %d system patches.", count)
+		}
+	}
+
+	fmt.Println()
+	return m.flushUpdates()
+}
+
+func (m *PSQLToSpiceDBMigration) MigrateContentHostsAndSystemsToSpiceDb(ctx context.Context) error {
 	m.context = ctx
 	rows, err := m.postgres.Query(ctx, "select sp.id AS systemid, ih.id AS hostid, sp.rh_account_id from system_platform sp JOIN inventory.hosts ih ON sp.inventory_id = ih.id")
 	if err != nil {
@@ -81,8 +113,8 @@ func (m *PSQLToSpiceDBMigration) MigrationContentDataToSpiceDb(ctx context.Conte
 		}
 
 		count++
-		if count%1_000 == 0 {
-			fmt.Printf("Processed %d hosts.\n", count)
+		if count%1 == 0 {
+			fmt.Printf("\rProcessed %d hosts.\n", count)
 		}
 	}
 

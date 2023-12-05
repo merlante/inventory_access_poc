@@ -54,7 +54,15 @@ func initServer() {
 	if os.Getenv("RUN_ACTION") == "MIGRATE_CONTENT_TO_SPICEDB" {
 		fmt.Printf("Running migration from ContentDB to SpiceDB")
 		migrator := migration.NewPSQLToSpiceDBMigration(pgConn, spiceDbClient)
-		if err := migrator.MigrationContentDataToSpiceDb(context.TODO()); err != nil {
+		if err := migrator.MigrateContentHostsAndSystemsToSpiceDb(context.TODO()); err != nil {
+			panic(err)
+		}
+		return
+	}
+	if os.Getenv("RUN_ACTION") == "MIGRATE_PACKAGES_TO_SPICEDB" {
+		fmt.Printf("Running migration of packages from ContentDB to SpiceDB")
+		migrator := migration.NewPSQLToSpiceDBMigration(pgConn, spiceDbClient)
+		if err := migrator.MigratePackages(context.TODO()); err != nil {
 			panic(err)
 		}
 		return

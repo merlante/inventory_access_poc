@@ -2,7 +2,10 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"github.com/merlante/inventory-access-poc/opentelemetry"
+	"go.opentelemetry.io/otel"
 	"net/http"
 	"os"
 
@@ -10,7 +13,6 @@ import (
 	"github.com/merlante/inventory-access-poc/cachecontent"
 	"github.com/merlante/inventory-access-poc/client"
 	"github.com/merlante/inventory-access-poc/migration"
-
 	"github.com/merlante/inventory-access-poc/server"
 )
 
@@ -22,6 +24,11 @@ var (
 
 func main() {
 	overwriteVarsFromEnv()
+
+	otelShutdown, err := initOpenTelemetry()
+	defer func() {
+		err = errors.Join(err, otelShutdown(context.Background()))
+	}()
 
 	if os.Getenv("RUN_ACTION") == "REFRESH_PACKAGE_CACHES" {
 		RefreshPackagesCaches()
@@ -68,7 +75,10 @@ func initServer() {
 		return
 	}
 
+	tracer := otel.Tracer("HttpServer")
+
 	srv := server.ContentServer{
+		Tracer:        tracer,
 		SpicedbClient: spiceDbClient,
 		PostgresConn:  pgConn,
 	}
@@ -98,4 +108,13 @@ func overwriteVarsFromEnv() {
 	if envContentPgUri != "" {
 		contentPgUri = envContentPgUri
 	}
+}
+
+func initOpenTelemetry() (shutdown func(context.Context) error, err error) {
+	// Set up OpenTelemetry.
+	serviceName := "inventory_access_poc"
+	serviceVersion := "0.1.0"
+	shutdown, err = opentelemetry.SetupOTelSDK(context.TODO(), serviceName, serviceVersion)
+
+	return
 }

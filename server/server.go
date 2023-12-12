@@ -27,11 +27,11 @@ type Package struct {
 	Synced          bool          `json:"synced"`
 }
 
-type PackagePayload struct {
-	Packages []Package `json:"packages"`
+type PackagesPayload struct {
+	Data []Package `json:"data"`
 }
 
-func (p PackagePayload) VisitGetContentPackagesResponse(w http.ResponseWriter) error {
+func (p PackagesPayload) VisitGetContentPackagesResponse(w http.ResponseWriter) error {
 	jsonResponse, err := json.Marshal(p)
 	if err != nil {
 		return err
@@ -51,29 +51,29 @@ type PreFilterServer struct {
 	PostgresConn  *pgx.Conn
 }
 
-func (c *PreFilterServer) QueryPackages() (PackagePayload, error) {
+func (c *PreFilterServer) GetPackagesPayload() (PackagesPayload, error) {
 	rows, err := c.PostgresConn.Query(context.Background(), "SELECT name_id, evra, description_hash, summary_hash, advisory_id, synced synced FROM package;")
 	if err != nil {
-		return PackagePayload{}, fmt.Errorf("Failed to query packages: %w", err)
+		return PackagesPayload{}, fmt.Errorf("Failed to query packages: %w", err)
 	}
 
 	defer rows.Close()
-	ps := PackagePayload{}
+	payload := PackagesPayload{}
 
 	for rows.Next() {
 		var p Package
 		rows.Scan(&p.NameId, &p.Evra, &p.DescriptionHash, &p.SummaryHash, &p.AdvisoryId, &p.Synced)
 		if err != nil {
-			return PackagePayload{}, fmt.Errorf("Failed to scan packages: %w", err)
+			return PackagesPayload{}, fmt.Errorf("Failed to scan packages: %w", err)
 		}
-		ps.Packages = append(ps.Packages, p)
+		payload.Data = append(payload.Data, p)
 	}
 
 	if rows.Err() != nil {
-		return PackagePayload{}, fmt.Errorf("Failed to iterate rows: %w", rows.Err())
+		return PackagesPayload{}, fmt.Errorf("Failed to iterate rows: %w", rows.Err())
 	}
 
-	return ps, nil
+	return payload, nil
 }
 
 func (c *PreFilterServer) GetContentPackages(ctx context.Context, request api.GetContentPackagesRequestObject) (api.GetContentPackagesResponseObject, error) {
@@ -88,6 +88,6 @@ func (c *PreFilterServer) GetContentPackages(ctx context.Context, request api.Ge
 	time.Sleep(time.Second) // mimics the delay calling out to Postgres
 	pgSpan.End()
 
-	packages, err := c.QueryPackages()
+	packages, err := c.GetPackagesPayload()
 	return packages, err
 }

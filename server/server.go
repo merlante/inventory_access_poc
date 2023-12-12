@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"github.com/authzed/authzed-go/v1"
@@ -19,12 +18,12 @@ type PackageName struct {
 }
 
 type Package struct {
-	NameId          int64         `json:"name_id"`
-	Evra            string        `json:"evra"`
-	DescriptionHash []byte        `json:"description_hash"`
-	SummaryHash     []byte        `json:"summary_hash"`
-	AdvisoryId      sql.NullInt64 `json:"advisory_id"`
-	Synced          bool          `json:"synced"`
+	NameId          int64  `json:"name_id"`
+	Evra            string `json:"evra"`
+	DescriptionHash []byte `json:"description_hash"`
+	SummaryHash     []byte `json:"summary_hash"`
+	AdvisoryId      *int64 `json:"advisory_id"`
+	Synced          bool   `json:"synced"`
 }
 
 type PackagesPayload struct {

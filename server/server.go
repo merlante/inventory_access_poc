@@ -12,18 +12,12 @@ import (
 	"time"
 )
 
-type PackageName struct {
-	Name    string `json:"name"`
-	Summary string `json:"summary"`
-}
-
 type Package struct {
-	NameId          int64  `json:"name_id"`
-	Evra            string `json:"evra"`
-	DescriptionHash []byte `json:"description_hash"`
-	SummaryHash     []byte `json:"summary_hash"`
-	AdvisoryId      *int64 `json:"advisory_id"`
-	Synced          bool   `json:"synced"`
+	Name               string `json:"name"`
+	Summary            string `json:"summary"`
+	SystemsApplicable  int    `json:"systems_applicable"`
+	SystemsInstallable int    `json:"systems_installable"`
+	SystemsInstalled   int    `json:"systems_installed"`
 }
 
 type PackagesPayload struct {
@@ -51,7 +45,16 @@ type PreFilterServer struct {
 }
 
 func (c *PreFilterServer) GetPackagesPayload() (PackagesPayload, error) {
-	rows, err := c.PostgresConn.Query(context.Background(), "SELECT name_id, evra, description_hash, summary_hash, advisory_id, synced synced FROM package;")
+	q := `
+		SELECT pn.name,
+		       pn.summary,
+		       res.systems_applicable,
+		       res.systems_installable,
+		       res.systems_installed
+		FROM package_account_data res
+		JOIN package_name pn ON res.package_name_id = pn.id;
+	`
+	rows, err := c.PostgresConn.Query(context.Background(), q)
 	if err != nil {
 		return PackagesPayload{}, fmt.Errorf("Failed to query packages: %w", err)
 	}
@@ -61,7 +64,7 @@ func (c *PreFilterServer) GetPackagesPayload() (PackagesPayload, error) {
 
 	for rows.Next() {
 		var p Package
-		rows.Scan(&p.NameId, &p.Evra, &p.DescriptionHash, &p.SummaryHash, &p.AdvisoryId, &p.Synced)
+		rows.Scan(&p.Name, &p.Summary, &p.SystemsApplicable, &p.SystemsInstallable, &p.SystemsInstalled)
 		if err != nil {
 			return PackagesPayload{}, fmt.Errorf("Failed to scan packages: %w", err)
 		}

@@ -77,13 +77,13 @@ func initServer() {
 
 	tracer := otel.Tracer("HttpServer")
 
-	srv := server.ContentServer{
+	pfSrv := server.PreFilterServer{
 		Tracer:        tracer,
 		SpicedbClient: spiceDbClient,
 		PostgresConn:  pgConn,
 	}
 
-	preFilterHandler := api.Handler(api.NewStrictHandler(&srv, nil))
+	preFilterHandler := api.Handler(api.NewStrictHandler(&pfSrv, nil))
 
 	experimentHandlers := map[string]http.Handler{
 		"pre-filter": preFilterHandler,

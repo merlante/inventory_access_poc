@@ -39,13 +39,13 @@ func (p Package) VisitGetContentPackagesResponse(w http.ResponseWriter) error {
 	return nil
 }
 
-type ContentServer struct {
+type PreFilterServer struct {
 	Tracer        trace.Tracer
 	SpicedbClient *authzed.Client
 	PostgresConn  *pgx.Conn
 }
 
-func (c *ContentServer) GetContentPackages(ctx context.Context, request api.GetContentPackagesRequestObject) (api.GetContentPackagesResponseObject, error) {
+func (c *PreFilterServer) GetContentPackages(ctx context.Context, request api.GetContentPackagesRequestObject) (api.GetContentPackagesResponseObject, error) {
 	ctx, span := c.Tracer.Start(ctx, "GetContentPackages")
 	defer span.End()
 

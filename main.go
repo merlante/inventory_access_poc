@@ -82,15 +82,41 @@ func initServer() {
 		SpicedbClient: spiceDbClient,
 		PostgresConn:  pgConn,
 	}
-	r := api.Handler(api.NewStrictHandler(&srv, nil))
 
-	sErr := http.ListenAndServe(":8080", r)
+	preFilterHandler := api.Handler(api.NewStrictHandler(&srv, nil))
+
+	experimentHandlers := map[string]http.Handler{
+		"pre-filter": preFilterHandler,
+	}
+
+	h := getExperimentsHandler(&experimentHandlers)
+
+	sErr := http.ListenAndServe(":8080", h)
 
 	if sErr != nil {
 		err := fmt.Errorf("error at server startup: %v", sErr)
 		fmt.Println(err)
 		os.Exit(1)
 	}
+}
+
+// a mechanism for using request headers as a router for selecting the correct experiment/server implementation
+func getExperimentsHandler(handlerMap *map[string]http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		experiment := r.Header.Get("Experiment")
+		if experiment == "" {
+			experiment = "pre-filter"
+		}
+
+		h, found := (*handlerMap)[experiment]
+		if !found {
+			err := fmt.Errorf("error: no handler registered for Experiment %s specified in request header", experiment)
+			fmt.Println(err)
+			return
+		}
+
+		h.ServeHTTP(w, r)
+	})
 }
 
 func overwriteVarsFromEnv() {

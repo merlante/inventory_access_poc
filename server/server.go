@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"github.com/authzed/authzed-go/v1"
@@ -18,12 +19,12 @@ type PackageName struct {
 }
 
 type Package struct {
-	NameId          int    `json:"name_id"`
-	Evra            string `json:"evra"`
-	DescriptionHash string `json:"description_hash"`
-	SummaryHash     string `json:"summary_hash"`
-	AdvisoryId      int    `json:"advisory_id"`
-	Synced          bool   `json:"synced"`
+	NameId          int64         `json:"name_id"`
+	Evra            string        `json:"evra"`
+	DescriptionHash []byte        `json:"description_hash"`
+	SummaryHash     []byte        `json:"summary_hash"`
+	AdvisoryId      sql.NullInt64 `json:"advisory_id"`
+	Synced          bool          `json:"synced"`
 }
 
 type PackagePayload struct {
@@ -51,7 +52,7 @@ type PreFilterServer struct {
 }
 
 func (c *PreFilterServer) QueryPackages() (PackagePayload, error) {
-	rows, err := c.PostgresConn.Query(context.Background(), "SELECT name_id, evra, synced FROM package;")
+	rows, err := c.PostgresConn.Query(context.Background(), "SELECT name_id, evra, description_hash, summary_hash, advisory_id, synced synced FROM package;")
 	if err != nil {
 		return PackagePayload{}, fmt.Errorf("Failed to query packages: %w", err)
 	}
@@ -61,7 +62,7 @@ func (c *PreFilterServer) QueryPackages() (PackagePayload, error) {
 
 	for rows.Next() {
 		var p Package
-		rows.Scan(&p.NameId, &p.Evra, &p.Synced)
+		rows.Scan(&p.NameId, &p.Evra, &p.DescriptionHash, &p.SummaryHash, &p.AdvisoryId, &p.Synced)
 		if err != nil {
 			return PackagePayload{}, fmt.Errorf("Failed to scan packages: %w", err)
 		}

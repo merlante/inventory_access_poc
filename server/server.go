@@ -12,21 +12,19 @@ import (
 	"time"
 )
 
-type PackageName struct {
-	Name    string `json:"name"`
-	Summary string `json:"summary"`
-}
-
 type Package struct {
-	NameId          int    `json:"name_id"`
-	Evra            string `json:"evra"`
-	DescriptionHash string `json:"description_hash"`
-	SummaryHash     string `json:"summary_hash"`
-	AdvisoryId      int    `json:"advisory_id"`
-	Synced          bool   `json:"synced"`
+	Name               string `json:"name"`
+	Summary            string `json:"summary"`
+	SystemsApplicable  int    `json:"systems_applicable"`
+	SystemsInstallable int    `json:"systems_installable"`
+	SystemsInstalled   int    `json:"systems_installed"`
 }
 
-func (p Package) VisitGetContentPackagesResponse(w http.ResponseWriter) error {
+type PackagesPayload struct {
+	Data []Package `json:"data"`
+}
+
+func (p PackagesPayload) VisitGetContentPackagesResponse(w http.ResponseWriter) error {
 	jsonResponse, err := json.Marshal(p)
 	if err != nil {
 		return err
@@ -46,6 +44,40 @@ type PreFilterServer struct {
 	PostgresConn  *pgx.Conn
 }
 
+func (c *PreFilterServer) GetPackagesPayload() (PackagesPayload, error) {
+	q := `
+		SELECT pn.name,
+		       pn.summary,
+		       res.systems_applicable,
+		       res.systems_installable,
+		       res.systems_installed
+		FROM package_account_data res
+		JOIN package_name pn ON res.package_name_id = pn.id;
+	`
+	rows, err := c.PostgresConn.Query(context.Background(), q)
+	if err != nil {
+		return PackagesPayload{}, fmt.Errorf("Failed to query packages: %w", err)
+	}
+
+	defer rows.Close()
+	payload := PackagesPayload{}
+
+	for rows.Next() {
+		var p Package
+		rows.Scan(&p.Name, &p.Summary, &p.SystemsApplicable, &p.SystemsInstallable, &p.SystemsInstalled)
+		if err != nil {
+			return PackagesPayload{}, fmt.Errorf("Failed to scan packages: %w", err)
+		}
+		payload.Data = append(payload.Data, p)
+	}
+
+	if rows.Err() != nil {
+		return PackagesPayload{}, fmt.Errorf("Failed to iterate rows: %w", rows.Err())
+	}
+
+	return payload, nil
+}
+
 func (c *PreFilterServer) GetContentPackages(ctx context.Context, request api.GetContentPackagesRequestObject) (api.GetContentPackagesResponseObject, error) {
 	ctx, span := c.Tracer.Start(ctx, "GetContentPackages")
 	defer span.End()
@@ -63,8 +95,8 @@ func (c *PreFilterServer) GetContentPackages(ctx context.Context, request api.Ge
 	time.Sleep(time.Second) // mimics the delay calling out to Postgres
 	pgSpan.End()
 
-	p := Package{NameId: 123, Evra: "1-2", DescriptionHash: "Testing", SummaryHash: "FooBar", AdvisoryId: 321, Synced: false}
-	return p, nil
+	packages, err := c.GetPackagesPayload()
+	return packages, err
 }
 
 func getUserFromContext(ctx context.Context) (user string, found bool) {

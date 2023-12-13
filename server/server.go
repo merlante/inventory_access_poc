@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"github.com/authzed/authzed-go/v1"
 	"github.com/jackc/pgx/v5"
 	"github.com/merlante/inventory-access-poc/api"
@@ -49,6 +50,11 @@ func (c *PreFilterServer) GetContentPackages(ctx context.Context, request api.Ge
 	ctx, span := c.Tracer.Start(ctx, "GetContentPackages")
 	defer span.End()
 
+	// TODO: user will be needed in spicedb queries -- set Authorization request header to the userid
+	if user, found := getUserFromContext(ctx); found {
+		fmt.Printf("user found in request: %s\n", user)
+	}
+
 	_, spiceSpan := c.Tracer.Start(ctx, "SpiceDB pre-filter call")
 	time.Sleep(time.Second) // mimics the delay calling out to SpiceDB
 	spiceSpan.End()
@@ -59,4 +65,12 @@ func (c *PreFilterServer) GetContentPackages(ctx context.Context, request api.Ge
 
 	p := Package{NameId: 123, Evra: "1-2", DescriptionHash: "Testing", SummaryHash: "FooBar", AdvisoryId: 321, Synced: false}
 	return p, nil
+}
+
+func getUserFromContext(ctx context.Context) (user string, found bool) {
+	if user, ok := ctx.Value("user").(string); ok && user != "" {
+		return user, true
+	}
+
+	return
 }

@@ -90,6 +90,7 @@ func initServer() {
 	}
 
 	h := getExperimentsHandler(&experimentHandlers)
+	h = extractUserMiddleware(h)
 
 	sErr := http.ListenAndServe(":8080", h)
 
@@ -98,6 +99,20 @@ func initServer() {
 		fmt.Println(err)
 		os.Exit(1)
 	}
+}
+
+func extractUserMiddleware(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user := r.Header.Get("Authorization")
+
+		if user != "" {
+			ctx := context.WithValue(r.Context(), "user", user)
+			h.ServeHTTP(w, r.WithContext(ctx))
+			return
+		}
+
+		h.ServeHTTP(w, r)
+	})
 }
 
 // a mechanism for using request headers as a router for selecting the correct experiment/server implementation

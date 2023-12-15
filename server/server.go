@@ -3,25 +3,24 @@ package server
 import (
 	"context"
 	"encoding/json"
+	e "errors"
 	"fmt"
+	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 	"github.com/authzed/authzed-go/v1"
 	"github.com/jackc/pgx/v5"
 	"github.com/merlante/inventory-access-poc/api"
+	"github.com/merlante/inventory-access-poc/cachecontent"
+	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel/trace"
+	"gorm.io/gorm"
+	"io"
 	"net/http"
-	"time"
+	"strconv"
+	"strings"
 )
 
-type Package struct {
-	Name               string `json:"name"`
-	Summary            string `json:"summary"`
-	SystemsApplicable  int    `json:"systems_applicable"`
-	SystemsInstallable int    `json:"systems_installable"`
-	SystemsInstalled   int    `json:"systems_installed"`
-}
-
 type PackagesPayload struct {
-	Data []Package `json:"data"`
+	Data []cachecontent.PackageAccountData `json:"data"`
 }
 
 func (p PackagesPayload) VisitGetContentPackagesResponse(w http.ResponseWriter) error {
@@ -44,35 +43,10 @@ type PreFilterServer struct {
 	PostgresConn  *pgx.Conn
 }
 
-func (c *PreFilterServer) GetPackagesPayload() (PackagesPayload, error) {
-	q := `
-		SELECT pn.name,
-		       pn.summary,
-		       res.systems_applicable,
-		       res.systems_installable,
-		       res.systems_installed
-		FROM package_account_data res
-		JOIN package_name pn ON res.package_name_id = pn.id;
-	`
-	rows, err := c.PostgresConn.Query(context.Background(), q)
-	if err != nil {
-		return PackagesPayload{}, fmt.Errorf("Failed to query packages: %w", err)
-	}
-
-	defer rows.Close()
+func (c *PreFilterServer) GetPackagesPayload(acountData []cachecontent.PackageAccountData) (PackagesPayload, error) {
 	payload := PackagesPayload{}
-
-	for rows.Next() {
-		var p Package
-		rows.Scan(&p.Name, &p.Summary, &p.SystemsApplicable, &p.SystemsInstallable, &p.SystemsInstalled)
-		if err != nil {
-			return PackagesPayload{}, fmt.Errorf("Failed to scan packages: %w", err)
-		}
-		payload.Data = append(payload.Data, p)
-	}
-
-	if rows.Err() != nil {
-		return PackagesPayload{}, fmt.Errorf("Failed to iterate rows: %w", rows.Err())
+	for _, v := range acountData {
+		payload.Data = append(payload.Data, v)
 	}
 
 	return payload, nil
@@ -83,26 +57,110 @@ func (c *PreFilterServer) GetContentPackages(ctx context.Context, request api.Ge
 	defer span.End()
 
 	// TODO: user will be needed in spicedb queries -- set Authorization request header to the userid
-	if user, found := getUserFromContext(ctx); found {
-		fmt.Printf("user found in request: %s\n", user)
+
+	user, accountId, found := getIdentityFromContext(ctx)
+	if found {
+		fmt.Printf("indentity found in request: %s %d\n", user, accountId)
 	}
 
 	_, spiceSpan := c.Tracer.Start(ctx, "SpiceDB pre-filter call")
-	time.Sleep(time.Second) // mimics the delay calling out to SpiceDB
+
+	lrClient, err := c.SpicedbClient.LookupResources(ctx, &v1.LookupResourcesRequest{
+		ResourceObjectType: "inventory/host",
+		Permission:         "read",
+		Subject: &v1.SubjectReference{
+			Object: &v1.ObjectReference{
+				ObjectType: "user",
+				ObjectId:   "test",
+			},
+		},
+	})
+
+	if err != nil {
+		fmt.Errorf("spicedb error: %v", err)
+		return nil, err
+	}
+
+	var hostIDs []string
+	for {
+		next, err := lrClient.Recv()
+		if e.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			fmt.Errorf("spicedb error: %v", err)
+			return nil, err
+		}
+
+		hostIDs = append(hostIDs, next.GetResourceObjectId()) // e.g. service or inventory group
+	}
+
 	spiceSpan.End()
 
 	_, pgSpan := c.Tracer.Start(ctx, "Postgres query")
-	time.Sleep(time.Second) // mimics the delay calling out to Postgres
+
+	packageAccountData := make([]cachecontent.PackageAccountData, 0)
+	countError := packagesByHostIDs(&packageAccountData, accountId, hostIDs)
+	if countError != nil {
+		return nil, countError
+	}
+
+	packages, err := c.GetPackagesPayload(packageAccountData)
+
 	pgSpan.End()
 
-	packages, err := c.GetPackagesPayload()
 	return packages, err
 }
 
-func getUserFromContext(ctx context.Context) (user string, found bool) {
-	if user, ok := ctx.Value("user").(string); ok && user != "" {
-		return user, true
+func getIdentityFromContext(ctx context.Context) (user string, rhAccount int64, found bool) {
+	userInfo, ok := ctx.Value("user").(string)
+	if !ok {
+		// Handle case where the value is nil or not a string
+		return "", 0, false
+	}
+	
+	// Split the userInfo string to extract the user and rhAccount
+	parts := strings.Split(userInfo, ";")
+	if len(parts) != 2 {
+		// Handle error if the format is not as expected
+		return "", 0, false
 	}
 
-	return
+	// Assign the split values to user
+	user = parts[0]
+
+	// Convert the rhAccount part to int64
+	var err error
+	rhAccount, err = strconv.ParseInt(parts[1], 10, 64)
+	if err != nil {
+		// Handle error if the conversion fails
+		return "", 0, false
+	}
+
+	return user, rhAccount, true
+}
+
+func packagesByHostIDs(pkgSysCounts *[]cachecontent.PackageAccountData, accID int64, hostIDs []string) error {
+	err := cachecontent.WithReadReplicaTx(func(tx *gorm.DB) error {
+		q := tx.Table("system_platform sp").
+			Select(`
+				sp.rh_account_id rh_account_id,
+				spkg.name_id package_name_id,
+				count(*) as systems_installed,
+				count(*) filter (where update_status(spkg.update_data) = 'Installable') as systems_installable,
+				count(*) filter (where update_status(spkg.update_data) != 'None') as systems_applicable
+			`).
+			Joins("JOIN system_package spkg ON sp.id = spkg.system_id AND sp.rh_account_id = spkg.rh_account_id").
+			Joins("JOIN rh_account acc ON sp.rh_account_id = acc.id").
+			Joins("JOIN inventory.hosts ih ON sp.inventory_id = ih.id").
+			Where("sp.packages_installed > 0 AND sp.stale = FALSE").
+			Where("sp.rh_account_id = ?", accID).
+			Where("ih.id IN ?", hostIDs).
+			Group("sp.rh_account_id, spkg.name_id").
+			Order("sp.rh_account_id, spkg.name_id")
+
+		return q.Find(pkgSysCounts).Error
+	})
+
+	return errors.Wrap(err, "failed to get counts")
 }

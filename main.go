@@ -24,6 +24,7 @@ var (
 
 func main() {
 	overwriteVarsFromEnv()
+	cachecontent.Configure(contentPgUri)
 
 	otelShutdown, err := initOpenTelemetry()
 	defer func() {

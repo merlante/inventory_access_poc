@@ -12,6 +12,8 @@ import (
 	"go.opentelemetry.io/otel/trace"
 	"gorm.io/gorm"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -53,8 +55,10 @@ func (c *PreFilterServer) GetContentPackages(ctx context.Context, request api.Ge
 	defer span.End()
 
 	// TODO: user will be needed in spicedb queries -- set Authorization request header to the userid
-	if user, found := getUserFromContext(ctx); found {
-		fmt.Printf("user found in request: %s\n", user)
+
+	user, accountId, found := getIdentityFromContext(ctx)
+	if found {
+		fmt.Printf("indentity found in request: %s %d\n", user, accountId)
 	}
 
 	_, spiceSpan := c.Tracer.Start(ctx, "SpiceDB pre-filter call")
@@ -63,10 +67,9 @@ func (c *PreFilterServer) GetContentPackages(ctx context.Context, request api.Ge
 
 	_, pgSpan := c.Tracer.Start(ctx, "Postgres query")
 
-	account := 14
 	hostIDs := []string{"0154aafc-0773-4ab7-bd5b-d018e9a85d1b", "08f3c261-9194-40db-bc48-963078a6ac12", "09854380-3a33-4446-bdf6-9e759942d681"}
 	packageAccountData := make([]cachecontent.PackageAccountData, 0)
-	countError := packagesByHostIDs(&packageAccountData, &account, hostIDs)
+	countError := packagesByHostIDs(&packageAccountData, accountId, hostIDs)
 	if countError != nil {
 		return nil, countError
 	}
@@ -78,15 +81,43 @@ func (c *PreFilterServer) GetContentPackages(ctx context.Context, request api.Ge
 	return packages, err
 }
 
-func getUserFromContext(ctx context.Context) (user string, found bool) {
-	if user, ok := ctx.Value("user").(string); ok && user != "" {
-		return user, true
+func getIdentityFromContext(ctx context.Context) (user string, rhAccount int64, found bool) {
+	// Retrieve the value from the context
+	val := ctx.Value("user")
+	if val == nil {
+		// Handle case where the value is not found
+		return "", 0, false
 	}
 
-	return
+	// Convert the value to a string and split it
+	userInfo, ok := val.(string)
+	if !ok {
+		// Handle case where type assertion fails
+		return "", 0, false
+	}
+
+	// Split the userInfo string to extract the user and rhAccount
+	parts := strings.Split(userInfo, ";")
+	if len(parts) != 2 {
+		// Handle error if the format is not as expected
+		return "", 0, false
+	}
+
+	// Assign the split values to user
+	user = parts[0]
+
+	// Convert the rhAccount part to int64
+	var err error
+	rhAccount, err = strconv.ParseInt(parts[1], 10, 64)
+	if err != nil {
+		// Handle error if the conversion fails
+		return "", 0, false
+	}
+
+	return user, rhAccount, true
 }
 
-func packagesByHostIDs(pkgSysCounts *[]cachecontent.PackageAccountData, accID *int, hostIDs []string) error {
+func packagesByHostIDs(pkgSysCounts *[]cachecontent.PackageAccountData, accID int64, hostIDs []string) error {
 	err := cachecontent.WithReadReplicaTx(func(tx *gorm.DB) error {
 		q := tx.Table("system_platform sp").
 			Select(`
@@ -100,14 +131,9 @@ func packagesByHostIDs(pkgSysCounts *[]cachecontent.PackageAccountData, accID *i
 			Joins("JOIN rh_account acc ON sp.rh_account_id = acc.id").
 			Joins("JOIN inventory.hosts ih ON sp.inventory_id = ih.id").
 			Where("sp.packages_installed > 0 AND sp.stale = FALSE").
-			Where("ih.id IN ?", hostIDs).
+			Where("sp.rh_account_id = ?", accID).
 			Group("sp.rh_account_id, spkg.name_id").
 			Order("sp.rh_account_id, spkg.name_id")
-		if accID != nil {
-			q.Where("sp.rh_account_id = ?", *accID)
-		} else {
-			q.Where("acc.valid_package_cache = FALSE")
-		}
 
 		return q.Find(pkgSysCounts).Error
 	})

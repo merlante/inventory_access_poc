@@ -113,20 +113,12 @@ func (c *PreFilterServer) GetContentPackages(ctx context.Context, request api.Ge
 }
 
 func getIdentityFromContext(ctx context.Context) (user string, rhAccount int64, found bool) {
-	// Retrieve the value from the context
-	val := ctx.Value("user")
-	if val == nil {
-		// Handle case where the value is not found
-		return "", 0, false
-	}
-
-	// Convert the value to a string and split it
-	userInfo, ok := val.(string)
+	userInfo, ok := ctx.Value("user").(string)
 	if !ok {
-		// Handle case where type assertion fails
+		// Handle case where the value is nil or not a string
 		return "", 0, false
 	}
-
+	
 	// Split the userInfo string to extract the user and rhAccount
 	parts := strings.Split(userInfo, ";")
 	if len(parts) != 2 {

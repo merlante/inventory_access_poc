@@ -3,7 +3,9 @@ package server
 import (
 	"context"
 	"encoding/json"
+	e "errors"
 	"fmt"
+	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 	"github.com/authzed/authzed-go/v1"
 	"github.com/jackc/pgx/v5"
 	"github.com/merlante/inventory-access-poc/api"
@@ -11,10 +13,10 @@ import (
 	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel/trace"
 	"gorm.io/gorm"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 )
 
 type PackagesPayload struct {
@@ -62,12 +64,41 @@ func (c *PreFilterServer) GetContentPackages(ctx context.Context, request api.Ge
 	}
 
 	_, spiceSpan := c.Tracer.Start(ctx, "SpiceDB pre-filter call")
-	time.Sleep(time.Second) // mimics the delay calling out to SpiceDB
+
+	lrClient, err := c.SpicedbClient.LookupResources(ctx, &v1.LookupResourcesRequest{
+		ResourceObjectType: "inventory/host",
+		Permission:         "read",
+		Subject: &v1.SubjectReference{
+			Object: &v1.ObjectReference{
+				ObjectType: "user",
+				ObjectId:   "test",
+			},
+		},
+	})
+
+	if err != nil {
+		fmt.Errorf("spicedb error: %v", err)
+		return nil, err
+	}
+
+	var hostIDs []string
+	for {
+		next, err := lrClient.Recv()
+		if e.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			fmt.Errorf("spicedb error: %v", err)
+			return nil, err
+		}
+
+		hostIDs = append(hostIDs, next.GetResourceObjectId()) // e.g. service or inventory group
+	}
+
 	spiceSpan.End()
 
 	_, pgSpan := c.Tracer.Start(ctx, "Postgres query")
 
-	hostIDs := []string{"0154aafc-0773-4ab7-bd5b-d018e9a85d1b", "08f3c261-9194-40db-bc48-963078a6ac12", "09854380-3a33-4446-bdf6-9e759942d681"}
 	packageAccountData := make([]cachecontent.PackageAccountData, 0)
 	countError := packagesByHostIDs(&packageAccountData, accountId, hostIDs)
 	if countError != nil {

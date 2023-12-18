@@ -71,7 +71,7 @@ func (c *PreFilterServer) GetContentPackages(ctx context.Context, request api.Ge
 		Subject: &v1.SubjectReference{
 			Object: &v1.ObjectReference{
 				ObjectType: "user",
-				ObjectId:   "test",
+				ObjectId:   user,
 			},
 		},
 	})
@@ -118,7 +118,7 @@ func getIdentityFromContext(ctx context.Context) (user string, rhAccount int64, 
 		// Handle case where the value is nil or not a string
 		return "", 0, false
 	}
-	
+
 	// Split the userInfo string to extract the user and rhAccount
 	parts := strings.Split(userInfo, ";")
 	if len(parts) != 2 {

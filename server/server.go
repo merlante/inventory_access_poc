@@ -153,8 +153,6 @@ func packagesByHostIDs(pkgSysCounts *[]cachecontent.PackageAccountData, accID in
 			Joins("JOIN system_package spkg ON sp.id = spkg.system_id AND sp.rh_account_id = spkg.rh_account_id").
 			Joins("JOIN rh_account acc ON sp.rh_account_id = acc.id").
 			Joins("JOIN inventory.hosts ih ON sp.inventory_id = ih.id").
-			Where("sp.packages_installed > 0 AND sp.stale = FALSE").
-			Where("sp.rh_account_id = ?", accID).
 			Where("ih.id IN ?", hostIDs).
 			Group("sp.rh_account_id, spkg.name_id").
 			Order("sp.rh_account_id, spkg.name_id")

@@ -51,7 +51,7 @@ func initDBFromEnv(pgUri string) {
 	Cfg.DBMaxConnections = 250
 	Cfg.DBMaxIdleConnections = 50
 	Cfg.DBMaxConnectionLifetimeS = 60
-	Cfg.DBSslMode = "enable"
+	Cfg.DBSslMode = "require"
 	Cfg.DBWorkMem = 4096
 }
 

@@ -93,6 +93,7 @@ func initServer() {
 	h := getExperimentsHandler(&experimentHandlers)
 	h = extractUserMiddleware(h)
 	h = extractDatabaseOnlyFlagMiddleware(h)
+	h = extractLimitHostIDsFlagMiddleware(h)
 
 	sErr := http.ListenAndServe(":8080", h)
 
@@ -123,6 +124,20 @@ func extractDatabaseOnlyFlagMiddleware(h http.Handler) http.Handler {
 
 		if databaseOnlyFlag != "" {
 			ctx := context.WithValue(r.Context(), "Use-Database-Only", databaseOnlyFlag)
+			h.ServeHTTP(w, r.WithContext(ctx))
+			return
+		}
+
+		h.ServeHTTP(w, r)
+	})
+}
+
+func extractLimitHostIDsFlagMiddleware(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		limit := r.Header.Get("Limit-Host-IDs")
+
+		if limit != "" {
+			ctx := context.WithValue(r.Context(), "Limit-Host-IDs", limit)
 			h.ServeHTTP(w, r.WithContext(ctx))
 			return
 		}

@@ -73,13 +73,14 @@ func (c *PreFilterServer) GetContentPackagesWithDatabase(ctx context.Context, re
 		fmt.Printf("indentity found in request: %s %d\n", user, accountId)
 	}
 
+	limit := limitHostIDs(ctx)
+
 	inventoryHosts := make([]InventoryHost, 0)
 	err := cachecontent.WithReadReplicaTx(func(tx *gorm.DB) error {
-		result := tx.Raw("SELECT id FROM inventory.hosts LIMIT 1").Scan(&inventoryHosts)
+		result := tx.Raw("SELECT id FROM inventory.hosts LIMIT ?", limit).Scan(&inventoryHosts)
 		if result.Error != nil {
 			// Handle error
 			fmt.Println(result.Error)
-
 		}
 		return nil
 	})
@@ -169,6 +170,14 @@ func (c *PreFilterServer) GetContentPackagesWithSpiceDB(ctx context.Context, req
 	return packages, err
 }
 
+func limitHostIDs(ctx context.Context) string {
+	limitHostIDsParam, ok := ctx.Value("Limit-Host-IDs").(string)
+	if !ok {
+		return "1"
+	}
+
+	return limitHostIDsParam
+}
 func databaseOnly(ctx context.Context) (found bool) {
 	databaseOnlyFlag, ok := ctx.Value("Use-Database-Only").(string)
 	if !ok {

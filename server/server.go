@@ -43,7 +43,7 @@ func (p PackagesPayload) VisitGetContentPackagesResponse(w http.ResponseWriter) 
 
 type PreFilterServer struct {
 	Tracer        trace.Tracer
-	SpicedbClient *authzed.Client
+	SpicedbClient *authzed.ClientWithExperimental
 	PostgresConn  *pgx.Conn
 }
 
@@ -133,7 +133,8 @@ func (c *PreFilterServer) GetContentPackagesWithSpiceDB(ctx context.Context, req
 			},
 		},
 	})
-
+	//for post filtering via bulk checkpermission:
+	//c.SpicedbClient.BulkCheckPermission(...)
 	if err != nil {
 		fmt.Errorf("spicedb error: %v", err)
 		return nil, err

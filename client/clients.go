@@ -11,7 +11,7 @@ import (
 	"os"
 )
 
-func GetSpiceDbClient(endpoint string, presharedKey string) (*authzed.Client, error) {
+func GetSpiceDbClient(endpoint string, presharedKey string) (*authzed.ClientWithExperimental, error) {
 	fmt.Println("Attempting to connect to spicedb...")
 	defer func() {
 		fmt.Println("Connection to spicedb established")
@@ -24,7 +24,7 @@ func GetSpiceDbClient(endpoint string, presharedKey string) (*authzed.Client, er
 	opts = append(opts, grpcutil.WithInsecureBearerToken(presharedKey))
 	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 
-	return authzed.NewClient(
+	return authzed.NewClientWithExperimentalAPIs(
 		endpoint,
 		opts...,
 	)

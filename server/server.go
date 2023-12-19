@@ -112,6 +112,15 @@ func (c *PreFilterServer) GetContentPackages(ctx context.Context, request api.Ge
 	return packages, err
 }
 
+func databaseOnly(ctx context.Context) (found bool) {
+	databaseOnlyFlag, ok := ctx.Value("Use-Database-Only").(string)
+	if !ok {
+		return false
+	}
+
+	return databaseOnlyFlag == "true"
+}
+
 func getIdentityFromContext(ctx context.Context) (user string, rhAccount int64, found bool) {
 	userInfo, ok := ctx.Value("user").(string)
 	if !ok {

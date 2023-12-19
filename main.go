@@ -92,6 +92,7 @@ func initServer() {
 
 	h := getExperimentsHandler(&experimentHandlers)
 	h = extractUserMiddleware(h)
+	h = extractDatabaseOnlyFlagMiddleware(h)
 
 	sErr := http.ListenAndServe(":8080", h)
 
@@ -108,6 +109,20 @@ func extractUserMiddleware(h http.Handler) http.Handler {
 
 		if user != "" {
 			ctx := context.WithValue(r.Context(), "user", user)
+			h.ServeHTTP(w, r.WithContext(ctx))
+			return
+		}
+
+		h.ServeHTTP(w, r)
+	})
+}
+
+func extractDatabaseOnlyFlagMiddleware(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		databaseOnlyFlag := r.Header.Get("Use-Database-Only")
+
+		if databaseOnlyFlag != "" {
+			ctx := context.WithValue(r.Context(), "Use-Database-Only", databaseOnlyFlag)
 			h.ServeHTTP(w, r.WithContext(ctx))
 			return
 		}

@@ -19,6 +19,10 @@ import (
 	"strings"
 )
 
+type InventoryHost struct {
+	Id string
+}
+
 type PackagesPayload struct {
 	Data []cachecontent.PackageAccountData `json:"data"`
 }
@@ -52,7 +56,61 @@ func (c *PreFilterServer) GetPackagesPayload(acountData []cachecontent.PackageAc
 	return payload, nil
 }
 
+func getIdsFromInventoryHost(hosts []InventoryHost) []string {
+	var ids []string
+	for _, host := range hosts {
+		ids = append(ids, host.Id)
+	}
+	return ids
+}
+
+func (c *PreFilterServer) GetContentPackagesWithDatabase(ctx context.Context, request api.GetContentPackagesRequestObject) (api.GetContentPackagesResponseObject, error) {
+	ctx, span := c.Tracer.Start(ctx, "GetContentPackages")
+	defer span.End()
+
+	user, accountId, found := getIdentityFromContext(ctx)
+	if found {
+		fmt.Printf("indentity found in request: %s %d\n", user, accountId)
+	}
+
+	limit := limitHostIDs(ctx)
+
+	inventoryHosts := make([]InventoryHost, 0)
+	err := cachecontent.WithReadReplicaTx(func(tx *gorm.DB) error {
+		result := tx.Raw("SELECT id FROM inventory.hosts LIMIT ?", limit).Scan(&inventoryHosts)
+		if result.Error != nil {
+			// Handle error
+			fmt.Println(result.Error)
+		}
+		return nil
+	})
+
+	hostIDs := getIdsFromInventoryHost(inventoryHosts)
+
+	_, pgSpan := c.Tracer.Start(ctx, "Postgres query")
+
+	packageAccountData := make([]cachecontent.PackageAccountData, 0)
+	countError := packagesByHostIDs(&packageAccountData, accountId, hostIDs)
+	if countError != nil {
+		return nil, countError
+	}
+
+	packages, err := c.GetPackagesPayload(packageAccountData)
+
+	pgSpan.End()
+
+	return packages, err
+}
+
 func (c *PreFilterServer) GetContentPackages(ctx context.Context, request api.GetContentPackagesRequestObject) (api.GetContentPackagesResponseObject, error) {
+
+	if databaseOnly(ctx) {
+		return (*c).GetContentPackagesWithDatabase(ctx, request)
+	}
+	return (*c).GetContentPackagesWithSpiceDB(ctx, request)
+}
+
+func (c *PreFilterServer) GetContentPackagesWithSpiceDB(ctx context.Context, request api.GetContentPackagesRequestObject) (api.GetContentPackagesResponseObject, error) {
 	ctx, span := c.Tracer.Start(ctx, "GetContentPackages")
 	defer span.End()
 
@@ -110,6 +168,23 @@ func (c *PreFilterServer) GetContentPackages(ctx context.Context, request api.Ge
 	pgSpan.End()
 
 	return packages, err
+}
+
+func limitHostIDs(ctx context.Context) string {
+	limitHostIDsParam, ok := ctx.Value("Limit-Host-IDs").(string)
+	if !ok {
+		return "1"
+	}
+
+	return limitHostIDsParam
+}
+func databaseOnly(ctx context.Context) (found bool) {
+	databaseOnlyFlag, ok := ctx.Value("Use-Database-Only").(string)
+	if !ok {
+		return false
+	}
+
+	return databaseOnlyFlag == "true"
 }
 
 func getIdentityFromContext(ctx context.Context) (user string, rhAccount int64, found bool) {

@@ -9,6 +9,15 @@ docker-compose up --build
 ```
 Test using an endpoint like:
 ```
+curl "http://localhost:8080/content/packages" -H "Authorization: test_user;14" -H "Use-Database-Only: true"
+```
+
+```
+curl "http://localhost:8080/content/packages" -H "Authorization: test_user;14" -H "Use-Database-Only: true"  -H "Limit-Host-IDs: 10"
+```
+
+Test using an endpoint with using database only:
+```
 curl "http://localhost:8080/content/packages"
 ```
 ## Run REFRESH PACKAGE CACHES task

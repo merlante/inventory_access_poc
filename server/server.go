@@ -94,6 +94,8 @@ func (c *PreFilterServer) GetContentPackagesWithDatabase(ctx context.Context, re
 	var countError error
 	if extractQueryOptimalization(ctx) == "cte" {
 		countError = packagesByHostIDsCTE(&packageAccountData, accountId, hostIDs)
+	} else if extractQueryOptimalization(ctx) == "temp-table" {
+		countError = packagesByHostIDsTempTable(&packageAccountData, accountId, hostIDs)
 	} else {
 		countError = packagesByHostIDs(&packageAccountData, accountId, hostIDs)
 	}
@@ -286,6 +288,50 @@ func packagesByHostIDsCTE(pkgSysCounts *[]cachecontent.PackageAccountData, accID
         s.rh_account_id, s.name_id
     `
 		return tx.Raw(cteQuery, hostIDs).Scan(pkgSysCounts).Error
+	})
+
+	return errors.Wrap(err, "failed to get counts")
+}
+
+func packagesByHostIDsTempTable(pkgSysCounts *[]cachecontent.PackageAccountData, accID int64, hostIDs []string) error {
+	fmt.Printf("packagesByHostIDsTempTable")
+
+	err := cachecontent.WithReadReplicaTx(func(tx *gorm.DB) error {
+		// Step 1: Create a temporary table
+		if err := tx.Exec("CREATE TEMPORARY TABLE TempHostIDs (id UUID)").Error; err != nil {
+			return err
+		}
+
+		// Step 2: Insert hostIDs into the temporary table
+		for _, id := range hostIDs {
+			if err := tx.Exec("INSERT INTO TempHostIDs (id) VALUES (?)", id).Error; err != nil {
+				return err
+			}
+		}
+
+		// Step 3: Modify the main query to join with the temporary table
+		q := tx.Table("system_platform sp").
+			Select(`
+            sp.rh_account_id rh_account_id,
+            spkg.name_id package_name_id,
+            count(*) as systems_installed,
+            count(*) filter (where update_status(spkg.update_data) = 'Installable') as systems_installable,
+            count(*) filter (where update_status(spkg.update_data) != 'None') as systems_applicable
+        `).
+			Joins("JOIN system_package spkg ON sp.id = spkg.system_id AND sp.rh_account_id = spkg.rh_account_id").
+			Joins("JOIN rh_account acc ON sp.rh_account_id = acc.id").
+			Joins("JOIN inventory.hosts ih ON sp.inventory_id = ih.id").
+			Joins("JOIN TempHostIDs th ON ih.id = th.id"). // Join with the temporary table
+			Group("sp.rh_account_id, spkg.name_id").
+			Order("sp.rh_account_id, spkg.name_id")
+
+		// Execute the query
+		if err := q.Find(pkgSysCounts).Error; err != nil {
+			return err
+		}
+
+		// Optional: Drop the temporary table if needed
+		return tx.Exec("DROP TABLE TempHostIDs").Error
 	})
 
 	return errors.Wrap(err, "failed to get counts")

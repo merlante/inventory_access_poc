@@ -99,6 +99,8 @@ func (c *PreFilterServer) GetContentPackagesWithDatabase(ctx context.Context, re
 		countError = packagesByHostIDsTempTable(&packageAccountData, accountId, hostIDs)
 	} else if extractQueryOptimalization(ctx) == "cte-temp-table" {
 		countError = packagesByHostCTEinsteadOfTempTable(&packageAccountData, accountId, hostIDs)
+	} else if extractQueryOptimalization(ctx) == "no-counts" {
+		countError = packagesByHostIDsNoCounts(&packageAccountData, accountId, hostIDs)
 	} else {
 		countError = packagesByHostIDs(&packageAccountData, accountId, hostIDs)
 	}
@@ -368,6 +370,26 @@ func packagesByHostCTEinsteadOfTempTable(pkgSysCounts *[]cachecontent.PackageAcc
 			`
 
 		return tx.Raw(cteAndQuery, pq.Array(hostIDs)).Scan(pkgSysCounts).Error
+	})
+
+	return errors.Wrap(err, "failed to get counts")
+}
+
+func packagesByHostIDsNoCounts(pkgSysCounts *[]cachecontent.PackageAccountData, accID int64, hostIDs []string) error {
+	err := cachecontent.WithReadReplicaTx(func(tx *gorm.DB) error {
+		q := tx.Table("system_platform sp").
+			Select(`
+				sp.rh_account_id rh_account_id,
+				spkg.name_id package_name_id
+			`).
+			Joins("JOIN system_package spkg ON sp.id = spkg.system_id AND sp.rh_account_id = spkg.rh_account_id").
+			Joins("JOIN rh_account acc ON sp.rh_account_id = acc.id").
+			Joins("JOIN inventory.hosts ih ON sp.inventory_id = ih.id").
+			Where("ih.id IN ?", hostIDs).
+			Group("sp.rh_account_id, spkg.name_id").
+			Order("sp.rh_account_id, spkg.name_id")
+
+		return q.Find(pkgSysCounts).Error
 	})
 
 	return errors.Wrap(err, "failed to get counts")

@@ -93,7 +93,7 @@ type PostgreSQLConfig struct {
 }
 
 func createGormConfig(debug bool) *gorm.Config {
-	cfg := gorm.Config{}
+	cfg := gorm.Config{SkipDefaultTransaction: true}
 	if !debug {
 		cfg.Logger = logger.Default.LogMode(logger.Silent) // Allow "Slow SQL" warnings on debug mode only.
 	}

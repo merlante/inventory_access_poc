@@ -94,6 +94,7 @@ func initServer() {
 	h = extractUserMiddleware(h)
 	h = extractDatabaseOnlyFlagMiddleware(h)
 	h = extractLimitHostIDsFlagMiddleware(h)
+	h = extractQueryOptimalization(h)
 
 	sErr := http.ListenAndServe(":8080", h)
 
@@ -102,6 +103,20 @@ func initServer() {
 		fmt.Println(err)
 		os.Exit(1)
 	}
+}
+
+func extractQueryOptimalization(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		optimalization := r.Header.Get("Query-Optimalization")
+
+		if optimalization != "" {
+			ctx := context.WithValue(r.Context(), "query-optimalization", optimalization)
+			h.ServeHTTP(w, r.WithContext(ctx))
+			return
+		}
+
+		h.ServeHTTP(w, r)
+	})
 }
 
 func extractUserMiddleware(h http.Handler) http.Handler {

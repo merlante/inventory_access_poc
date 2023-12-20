@@ -8,6 +8,7 @@ import (
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 	"github.com/authzed/authzed-go/v1"
 	"github.com/jackc/pgx/v5"
+	"github.com/lib/pq"
 	"github.com/merlante/inventory-access-poc/api"
 	"github.com/merlante/inventory-access-poc/cachecontent"
 	"github.com/pkg/errors"
@@ -96,6 +97,8 @@ func (c *PreFilterServer) GetContentPackagesWithDatabase(ctx context.Context, re
 		countError = packagesByHostIDsCTE(&packageAccountData, accountId, hostIDs)
 	} else if extractQueryOptimalization(ctx) == "temp-table" {
 		countError = packagesByHostIDsTempTable(&packageAccountData, accountId, hostIDs)
+	} else if extractQueryOptimalization(ctx) == "cte-temp-table" {
+		countError = packagesByHostCTEinsteadOfTempTable(&packageAccountData, accountId, hostIDs)
 	} else {
 		countError = packagesByHostIDs(&packageAccountData, accountId, hostIDs)
 	}
@@ -332,6 +335,39 @@ func packagesByHostIDsTempTable(pkgSysCounts *[]cachecontent.PackageAccountData,
 
 		// Optional: Drop the temporary table if needed
 		return tx.Exec("DROP TABLE TempHostIDs").Error
+	})
+
+	return errors.Wrap(err, "failed to get counts")
+}
+
+func packagesByHostCTEinsteadOfTempTable(pkgSysCounts *[]cachecontent.PackageAccountData, accID int64, hostIDs []string) error {
+	fmt.Printf("packagesByHostCTEinsteadOfTempTable")
+
+	err := cachecontent.WithReadReplicaTx(func(tx *gorm.DB) error {
+		// Define the CTE and main query
+		cteAndQuery := `
+			WITH HostIDCTE AS (
+				 SELECT unnest(?::uuid[]) AS id  -- Convert the hostIDs slice to a set of rows
+			)
+			SELECT
+				sp.rh_account_id rh_account_id,
+				spkg.name_id package_name_id,
+				count(*) as systems_installed,
+				count(*) filter (where update_status(spkg.update_data) = 'Installable') as systems_installable,
+				count(*) filter (where update_status(spkg.update_data) != 'None') as systems_applicable
+			FROM
+				system_platform sp
+				JOIN system_package spkg ON sp.id = spkg.system_id AND sp.rh_account_id = spkg.rh_account_id
+				JOIN rh_account acc ON sp.rh_account_id = acc.id
+				JOIN inventory.hosts ih ON sp.inventory_id = ih.id
+				JOIN HostIDCTE hcte ON ih.id = hcte.id
+			GROUP BY
+				sp.rh_account_id, spkg.name_id
+			ORDER BY
+				sp.rh_account_id, spkg.name_id
+			`
+
+		return tx.Raw(cteAndQuery, pq.Array(hostIDs)).Scan(pkgSysCounts).Error
 	})
 
 	return errors.Wrap(err, "failed to get counts")

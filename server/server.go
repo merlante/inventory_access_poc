@@ -90,7 +90,14 @@ func (c *PreFilterServer) GetContentPackagesWithDatabase(ctx context.Context, re
 	_, pgSpan := c.Tracer.Start(ctx, "Postgres query")
 
 	packageAccountData := make([]cachecontent.PackageAccountData, 0)
-	countError := packagesByHostIDs(&packageAccountData, accountId, hostIDs)
+
+	var countError error
+	if extractQueryOptimalization(ctx) == "cte" {
+		countError = packagesByHostIDsCTE(&packageAccountData, accountId, hostIDs)
+	} else {
+		countError = packagesByHostIDs(&packageAccountData, accountId, hostIDs)
+	}
+
 	if countError != nil {
 		return nil, countError
 	}
@@ -215,6 +222,15 @@ func getIdentityFromContext(ctx context.Context) (user string, rhAccount int64, 
 	return user, rhAccount, true
 }
 
+func extractQueryOptimalization(ctx context.Context) string {
+	optimalization, ok := ctx.Value("query-optimalization").(string)
+	if !ok {
+		return ""
+	}
+
+	return optimalization
+}
+
 func packagesByHostIDs(pkgSysCounts *[]cachecontent.PackageAccountData, accID int64, hostIDs []string) error {
 	err := cachecontent.WithReadReplicaTx(func(tx *gorm.DB) error {
 		q := tx.Table("system_platform sp").
@@ -233,6 +249,43 @@ func packagesByHostIDs(pkgSysCounts *[]cachecontent.PackageAccountData, accID in
 			Order("sp.rh_account_id, spkg.name_id")
 
 		return q.Find(pkgSysCounts).Error
+	})
+
+	return errors.Wrap(err, "failed to get counts")
+}
+
+func packagesByHostIDsCTE(pkgSysCounts *[]cachecontent.PackageAccountData, accID int64, hostIDs []string) error {
+	fmt.Printf("packagesByHostIDsCTE")
+
+	err := cachecontent.WithReadReplicaTx(func(tx *gorm.DB) error {
+		cteQuery := `
+    WITH CTE_SystemUpdateStatus AS (
+        SELECT
+            sp.rh_account_id,
+            spkg.name_id,
+            spkg.update_data,
+            update_status(spkg.update_data) as update_status
+        FROM
+            system_platform sp
+            JOIN system_package spkg ON sp.id = spkg.system_id AND sp.rh_account_id = spkg.rh_account_id
+            JOIN inventory.hosts ih ON sp.inventory_id = ih.id
+        WHERE
+            ih.id IN ?
+    )
+    SELECT
+        s.rh_account_id,
+        s.name_id,
+        count(*) as systems_installed,
+        count(*) filter (where s.update_status = 'Installable') as systems_installable,
+        count(*) filter (where s.update_status != 'None') as systems_applicable
+    FROM
+        CTE_SystemUpdateStatus s
+    GROUP BY
+        s.rh_account_id, s.name_id
+    ORDER BY
+        s.rh_account_id, s.name_id
+    `
+		return tx.Raw(cteQuery, hostIDs).Scan(pkgSysCounts).Error
 	})
 
 	return errors.Wrap(err, "failed to get counts")

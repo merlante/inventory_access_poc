@@ -5,6 +5,11 @@ import (
 	"encoding/json"
 	e "errors"
 	"fmt"
+	"io"
+	"net/http"
+	"strconv"
+	"strings"
+
 	v1 "github.com/authzed/authzed-go/proto/authzed/api/v1"
 	"github.com/authzed/authzed-go/v1"
 	"github.com/jackc/pgx/v5"
@@ -14,10 +19,6 @@ import (
 	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel/trace"
 	"gorm.io/gorm"
-	"io"
-	"net/http"
-	"strconv"
-	"strings"
 )
 
 type InventoryHost struct {
@@ -46,15 +47,6 @@ type PreFilterServer struct {
 	Tracer        trace.Tracer
 	SpicedbClient *authzed.Client
 	PostgresConn  *pgx.Conn
-}
-
-func (c *PreFilterServer) GetPackagesPayload(acountData []cachecontent.PackageAccountData) (PackagesPayload, error) {
-	payload := PackagesPayload{}
-	for _, v := range acountData {
-		payload.Data = append(payload.Data, v)
-	}
-
-	return payload, nil
 }
 
 func getIdsFromInventoryHost(hosts []InventoryHost) []string {
@@ -109,7 +101,7 @@ func (c *PreFilterServer) GetContentPackagesWithDatabase(ctx context.Context, re
 		return nil, countError
 	}
 
-	packages, err := c.GetPackagesPayload(packageAccountData)
+	packages, err := GetPackagesPayload(packageAccountData)
 
 	pgSpan.End()
 
@@ -177,11 +169,33 @@ func (c *PreFilterServer) GetContentPackagesWithSpiceDB(ctx context.Context, req
 		return nil, countError
 	}
 
-	packages, err := c.GetPackagesPayload(packageAccountData)
+	packages, err := GetPackagesPayload(packageAccountData)
 
 	pgSpan.End()
 
 	return packages, err
+}
+
+type BaselineServer struct {
+	Tracer        trace.Tracer
+	SpicedbClient *authzed.Client
+	PostgresConn  *pgx.Conn
+}
+
+func (c *BaselineServer) GetContentPackages(ctx context.Context, request api.GetContentPackagesRequestObject) (api.GetContentPackagesResponseObject, error) {
+	//Intended to mimic existing code by querying the database based on authorized host groups with only the DB query being measured
+	//Host groups can be retrieved from SpiceDB, but would need need to be done outside any metering block
+	//Host groups could also be a parameter passed explicitly, but for the experiments to be valid, the host groups would need to be -exactly- the same as what would be returned from SpiceDB
+	return GetPackagesPayload(make([]cachecontent.PackageAccountData, 0))
+}
+
+func GetPackagesPayload(acountData []cachecontent.PackageAccountData) (PackagesPayload, error) {
+	payload := PackagesPayload{}
+	for _, v := range acountData {
+		payload.Data = append(payload.Data, v)
+	}
+
+	return payload, nil
 }
 
 func limitHostIDs(ctx context.Context) string {

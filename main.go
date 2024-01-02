@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/merlante/inventory-access-poc/opentelemetry"
-	"go.opentelemetry.io/otel"
 	"net/http"
 	"os"
+
+	"github.com/merlante/inventory-access-poc/opentelemetry"
+	"go.opentelemetry.io/otel"
 
 	"github.com/merlante/inventory-access-poc/api"
 	"github.com/merlante/inventory-access-poc/cachecontent"
@@ -84,10 +85,18 @@ func initServer() {
 		PostgresConn:  pgConn,
 	}
 
+	blSrv := server.BaselineServer{
+		Tracer:        tracer,
+		SpicedbClient: spiceDbClient,
+		PostgresConn:  pgConn,
+	}
+
 	preFilterHandler := api.Handler(api.NewStrictHandler(&pfSrv, nil))
+	baselineHandler := api.Handler(api.NewStrictHandler(&blSrv, nil))
 
 	experimentHandlers := map[string]http.Handler{
 		"pre-filter": preFilterHandler,
+		"baseline":   baselineHandler,
 	}
 
 	h := getExperimentsHandler(&experimentHandlers)

@@ -186,7 +186,72 @@ func (c *BaselineServer) GetContentPackages(ctx context.Context, request api.Get
 	//Intended to mimic existing code by querying the database based on authorized host groups with only the DB query being measured
 	//Host groups can be retrieved from SpiceDB, but would need need to be done outside any metering block
 	//Host groups could also be a parameter passed explicitly, but for the experiments to be valid, the host groups would need to be -exactly- the same as what would be returned from SpiceDB
-	return GetPackagesPayload(make([]cachecontent.PackageAccountData, 0))
+
+	//Any SpiceDB queries here (not metered)
+
+	user, accountId, found := getIdentityFromContext(ctx)
+	if found {
+		fmt.Printf("identity found in request: %s %d\n", user, accountId)
+	}
+
+	lrClient, err := c.SpicedbClient.LookupResources(ctx, &v1.LookupResourcesRequest{
+		ResourceObjectType: "workspace",
+		Permission:         "inventory_all_read",
+		Subject: &v1.SubjectReference{
+			Object: &v1.ObjectReference{
+				ObjectType: "user",
+				ObjectId:   user,
+			},
+		},
+	})
+
+	if err != nil {
+		fmt.Errorf("spicedb error: %v", err)
+		return nil, err
+	}
+
+	var accIDs []int64
+	for {
+		next, err := lrClient.Recv()
+		if e.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			fmt.Errorf("spicedb error: %v", err)
+			return nil, err
+		}
+
+		workspace := next.GetResourceObjectId()
+		path := strings.Split(workspace, "/")
+		if len(path) > 0 {
+			if n := strings.Index(path[0], "_root"); n > 0 {
+				accID := path[0][:n] //The first segment up to but not including '_root'
+				numericAccID, err := strconv.ParseInt(accID, 10, 64)
+				if err != nil {
+					fmt.Printf("Error parsing account id %s as int64: %w", err)
+					continue
+				}
+				accIDs = append(accIDs, numericAccID)
+			}
+		}
+	}
+
+	ctx, span := c.Tracer.Start(ctx, "GetContentPackages")
+	defer span.End()
+
+	_, pgSpan := c.Tracer.Start(ctx, "Postgres query")
+
+	packageAccountData := make([]cachecontent.PackageAccountData, 0)
+
+	countError := packagesByAccounts(&packageAccountData, accIDs)
+	if countError != nil {
+		return nil, countError
+	}
+
+	packages, err := GetPackagesPayload(packageAccountData)
+	pgSpan.End()
+
+	return packages, err
 }
 
 func GetPackagesPayload(acountData []cachecontent.PackageAccountData) (PackagesPayload, error) {
@@ -266,6 +331,31 @@ func packagesByHostIDs(pkgSysCounts *[]cachecontent.PackageAccountData, accID in
 			Joins("JOIN rh_account acc ON sp.rh_account_id = acc.id").
 			Joins("JOIN inventory.hosts ih ON sp.inventory_id = ih.id").
 			Where("ih.id IN ?", hostIDs).
+			Group("sp.rh_account_id, spkg.name_id").
+			Order("sp.rh_account_id, spkg.name_id")
+
+		return q.Find(pkgSysCounts).Error
+	})
+
+	return errors.Wrap(err, "failed to get counts")
+}
+
+func packagesByAccounts(pkgSysCounts *[]cachecontent.PackageAccountData, accIDs []int64) error {
+	//Account IDs are a passthrough representation of inventory groups because each account only has ungrouped hosts
+	err := cachecontent.WithReadReplicaTx(func(tx *gorm.DB) error {
+		q := tx.Table("system_platform sp").
+			Select(`
+				sp.rh_account_id rh_account_id,
+				spkg.name_id package_name_id,
+				count(*) as systems_installed,
+				count(*) filter (where update_status(spkg.update_data) = 'Installable') as systems_installable,
+				count(*) filter (where update_status(spkg.update_data) != 'None') as systems_applicable
+			`).
+			Joins("JOIN system_package spkg ON sp.id = spkg.system_id AND sp.rh_account_id = spkg.rh_account_id").
+			Joins("JOIN rh_account acc ON sp.rh_account_id = acc.id").
+			Joins("JOIN inventory.hosts ih ON sp.inventory_id = ih.id").
+			Where("ih.groups = '[]'").
+			Where("sp.rh_account_id IN ?", accIDs).
 			Group("sp.rh_account_id, spkg.name_id").
 			Order("sp.rh_account_id, spkg.name_id")
 

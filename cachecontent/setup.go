@@ -51,7 +51,16 @@ func initDBFromEnv(pgUri string) {
 	Cfg.DBMaxConnections = 250
 	Cfg.DBMaxIdleConnections = 50
 	Cfg.DBMaxConnectionLifetimeS = 60
-	Cfg.DBSslMode = "require"
+
+	params := u.Query()
+	sslMode := params.Get("sslmode")
+
+	if sslMode == "disable" || sslMode == "require" {
+		Cfg.DBSslMode = params.Get("sslmode")
+	} else {
+		panic("SSL mode is not defined properly: " + sslMode)
+	}
+
 	Cfg.DBWorkMem = 4096
 }
 

@@ -101,9 +101,6 @@ func initServer() {
 
 	h := getExperimentsHandler(&experimentHandlers)
 	h = extractUserMiddleware(h)
-	h = extractDatabaseOnlyFlagMiddleware(h)
-	h = extractLimitHostIDsFlagMiddleware(h)
-	h = extractQueryOptimalization(h)
 
 	sErr := http.ListenAndServe(":8080", h)
 
@@ -112,20 +109,6 @@ func initServer() {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-}
-
-func extractQueryOptimalization(h http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		optimalization := r.Header.Get("Query-Optimalization")
-
-		if optimalization != "" {
-			ctx := context.WithValue(r.Context(), "query-optimalization", optimalization)
-			h.ServeHTTP(w, r.WithContext(ctx))
-			return
-		}
-
-		h.ServeHTTP(w, r)
-	})
 }
 
 func extractUserMiddleware(h http.Handler) http.Handler {
@@ -141,35 +124,6 @@ func extractUserMiddleware(h http.Handler) http.Handler {
 		h.ServeHTTP(w, r)
 	})
 }
-
-func extractDatabaseOnlyFlagMiddleware(h http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		databaseOnlyFlag := r.Header.Get("Use-Database-Only")
-
-		if databaseOnlyFlag != "" {
-			ctx := context.WithValue(r.Context(), "Use-Database-Only", databaseOnlyFlag)
-			h.ServeHTTP(w, r.WithContext(ctx))
-			return
-		}
-
-		h.ServeHTTP(w, r)
-	})
-}
-
-func extractLimitHostIDsFlagMiddleware(h http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		limit := r.Header.Get("Limit-Host-IDs")
-
-		if limit != "" {
-			ctx := context.WithValue(r.Context(), "Limit-Host-IDs", limit)
-			h.ServeHTTP(w, r.WithContext(ctx))
-			return
-		}
-
-		h.ServeHTTP(w, r)
-	})
-}
-
 // a mechanism for using request headers as a router for selecting the correct experiment/server implementation
 func getExperimentsHandler(handlerMap *map[string]http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

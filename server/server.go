@@ -84,21 +84,10 @@ func (c *PreFilterServer) GetContentPackagesWithDatabase(ctx context.Context, re
 
 	packageAccountData := make([]cachecontent.PackageAccountData, 0)
 
-	var countError error
-	if extractQueryOptimalization(ctx) == "cte" {
-		countError = packagesByHostIDsCTE(&packageAccountData, accountId, hostIDs)
-	} else if extractQueryOptimalization(ctx) == "temp-table" {
-		countError = packagesByHostIDsTempTable(&packageAccountData, accountId, hostIDs)
-	} else if extractQueryOptimalization(ctx) == "cte-temp-table" {
-		countError = packagesByHostCTEinsteadOfTempTable(&packageAccountData, accountId, hostIDs)
-	} else if extractQueryOptimalization(ctx) == "no-counts" {
-		countError = packagesByHostIDsNoCounts(&packageAccountData, accountId, hostIDs)
-	} else {
-		countError = packagesByHostIDs(&packageAccountData, accountId, hostIDs)
-	}
+	err = packagesByHostIDs(&packageAccountData, accountId, hostIDs)
 
-	if countError != nil {
-		return nil, countError
+	if err != nil {
+		return nil, err
 	}
 
 	packages, err := GetPackagesPayload(packageAccountData)
@@ -109,14 +98,6 @@ func (c *PreFilterServer) GetContentPackagesWithDatabase(ctx context.Context, re
 }
 
 func (c *PreFilterServer) GetContentPackages(ctx context.Context, request api.GetContentPackagesRequestObject) (api.GetContentPackagesResponseObject, error) {
-
-	if databaseOnly(ctx) {
-		return (*c).GetContentPackagesWithDatabase(ctx, request)
-	}
-	return (*c).GetContentPackagesWithSpiceDB(ctx, request)
-}
-
-func (c *PreFilterServer) GetContentPackagesWithSpiceDB(ctx context.Context, request api.GetContentPackagesRequestObject) (api.GetContentPackagesResponseObject, error) {
 	ctx, span := c.Tracer.Start(ctx, "GetContentPackages")
 	defer span.End()
 
@@ -270,14 +251,6 @@ func limitHostIDs(ctx context.Context) string {
 	}
 
 	return limitHostIDsParam
-}
-func databaseOnly(ctx context.Context) (found bool) {
-	databaseOnlyFlag, ok := ctx.Value("Use-Database-Only").(string)
-	if !ok {
-		return false
-	}
-
-	return databaseOnlyFlag == "true"
 }
 
 func getIdentityFromContext(ctx context.Context) (user string, rhAccount int64, found bool) {

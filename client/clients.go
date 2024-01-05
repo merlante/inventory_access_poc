@@ -22,7 +22,7 @@ func GetSpiceDbClient(endpoint string, presharedKey string) (*authzed.Client, er
 	opts = append(opts, grpc.WithBlock())
 	opts = append(opts, grpcutil.WithInsecureBearerToken(presharedKey))
 	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	fmt.Printf("Now connecting to endpoint: %s using PSK: %s", endpoint, presharedKey)
+
 	return authzed.NewClient(
 		endpoint,
 		opts...,

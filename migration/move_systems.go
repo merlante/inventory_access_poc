@@ -90,16 +90,6 @@ func (m *MoveSystemsMigration) MoveSystems(ctx context.Context, fromAccount int6
 		return nil
 	}
 
-	if err = execWithRollback("ALTER TABLE system_repo DISABLE TRIGGER ALL"); err != nil {
-		return err
-	}
-	if err = execWithRollback("ALTER TABLE system_advisories DISABLE TRIGGER ALL"); err != nil {
-		return err
-	}
-	if err = execWithRollback("ALTER TABLE system_platform DISABLE TRIGGER ALL"); err != nil {
-		return err
-	}
-
 	if err = execWithRollback("update system_repo set rh_account_id = $1 where rh_account_id = $2;", toAccount, fromAccount); err != nil {
 		return err
 	}
@@ -110,16 +100,6 @@ func (m *MoveSystemsMigration) MoveSystems(ctx context.Context, fromAccount int6
 		return err
 	}
 	if err = execWithRollback("update baseline set rh_account_id = $1 where rh_account_id = $2;", toAccount, fromAccount); err != nil {
-		return err
-	}
-
-	if err = execWithRollback("ALTER TABLE system_repo ENABLE TRIGGER ALL"); err != nil {
-		return err
-	}
-	if err = execWithRollback("ALTER TABLE system_advisories ENABLE TRIGGER ALL"); err != nil {
-		return err
-	}
-	if err = execWithRollback("ALTER TABLE system_platform ENABLE TRIGGER ALL"); err != nil {
 		return err
 	}
 	_, err = m.spiceDb.WriteRelationships(ctx, &v1.WriteRelationshipsRequest{

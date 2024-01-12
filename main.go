@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strconv"
 
 	"github.com/merlante/inventory-access-poc/opentelemetry"
 	"go.opentelemetry.io/otel"
@@ -76,6 +77,25 @@ func initServer() {
 		}
 		return
 	}
+	if os.Getenv("RUN_ACTION") == "MOVE_SYSTEMS" {
+		fromAccount, err := strconv.ParseInt(os.Getenv("FROM_ACCOUNT"), 10, 64)
+		if err != nil {
+			panic(err)
+		}
+
+		toAccount, err := strconv.ParseInt(os.Getenv("TO_ACCOUNT"), 10, 64)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Printf("Running migration of systems from account %d to account %d\n.", fromAccount, toAccount)
+
+		migrator := migration.NewMoveSystemsMigration(pgConn, spiceDbClient)
+
+		if err = migrator.MoveSystems(context.TODO(), fromAccount, toAccount); err != nil {
+			panic(err)
+		}
+		return
+	}
 
 	tracer := otel.Tracer("HttpServer")
 
@@ -124,6 +144,7 @@ func extractUserMiddleware(h http.Handler) http.Handler {
 		h.ServeHTTP(w, r)
 	})
 }
+
 // a mechanism for using request headers as a router for selecting the correct experiment/server implementation
 func getExperimentsHandler(handlerMap *map[string]http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
